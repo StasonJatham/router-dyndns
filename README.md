@@ -110,7 +110,7 @@ export DDNS_RATE_LIMIT_PER_MINUTE=60
 export DDNS_ADMIN_RATE_LIMIT_PER_MINUTE=20
 export DDNS_MAX_REQUEST_BODY_BYTES=16384
 export DDNS_CLEANUP_CHALLENGE_HOURS=72
-export DDNS_CLEANUP_UNUSED_ACCOUNT_HOURS=168
+export DDNS_CLEANUP_UNUSED_ACCOUNT_HOURS=1080
 export DDNS_CLEANUP_INTERVAL_SECONDS=3600
 ```
 
@@ -228,7 +228,7 @@ Security and cleanup defaults:
 | `DDNS_MAX_REQUEST_BODY_BYTES` | `16384` | Maximum accepted request body for form/API endpoints. |
 | `DDNS_TRUSTED_HOSTS` | from `DDNS_PUBLIC_BASE_URL` | Host header allowlist. Add every public hostname that should serve the app. |
 | `DDNS_CLEANUP_CHALLENGE_HOURS` | `72` | Delete unverified DNS TXT claims after this many hours. |
-| `DDNS_CLEANUP_UNUSED_ACCOUNT_HOURS` | `168` | Delete generated hostnames that never received a router update after this many hours. |
+| `DDNS_CLEANUP_UNUSED_ACCOUNT_HOURS` | `1080` | Delete generated hostnames that never received a router update after this many hours. |
 | `DDNS_CLEANUP_INTERVAL_SECONDS` | `3600` | Run the in-app cleanup scheduler at this interval. |
 
 SQLite backup example:
