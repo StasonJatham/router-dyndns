@@ -725,9 +725,10 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
           <span class="badge text-bg-primary rounded-circle align-self-start">2</span>
           <h3>Add the TXT record</h3>
           <p class="small text-secondary mb-0 mt-2">{status}</p>
-          {_copy_row("TXT name", verification_name)}
-          {_copy_row("TXT value", token)}
-          {_copy_row("Private claim link", claim_url)}
+          <div class="alert alert-info mb-0 py-2 small">TXT name and value are public DNS records. The private claim link is secret.</div>
+          {_copy_row("TXT name", verification_name, "Public")}
+          {_copy_row("TXT value", token, "Public")}
+          {_copy_row("Private claim link", claim_url, "Secret")}
           <form method="post" action="/verify-domain" class="mt-3" aria-label="Check DNS TXT verification">
             <input type="hidden" name="domain" value="{domain}">
             <input type="hidden" name="claim_secret" value="{claim_secret}">
@@ -813,13 +814,14 @@ def _credentials_panel(service: DdnsService, created_account: dict[str, str] | N
         <p class="eyebrow">Credentials generated</p>
         <h2>{html.escape(hostname)}</h2>
         <p class="section-copy">Save this now. The password and private status page are only shown on this screen. To use your own DNS name, create a CNAME from that name to this hostname.</p>
+        {_secret_notice()}
         <div class="d-grid gap-2">
-          {_copy_row("Update-URL:", update_url)}
-          {_copy_row("Domainnamen:", hostname)}
-          {_copy_row("CNAME target:", hostname)}
-          {_copy_row("Benutzername:", username)}
-          {_copy_row("Kennwort:", password)}
-          {_copy_row("Private status page:", management_url)}
+          {_copy_row("Update-URL:", update_url, "Secret")}
+          {_copy_row("Domainnamen:", hostname, "Public")}
+          {_copy_row("CNAME target:", hostname, "Public")}
+          {_copy_row("Benutzername:", username, "Public")}
+          {_copy_row("Kennwort:", password, "Secret")}
+          {_copy_row("Private status page:", management_url, "Secret")}
         </div>
       </div>
     </section>
@@ -841,14 +843,28 @@ def _admin_secret_panel(title: str, rows: list[str]) -> str:
     """
 
 
-def _copy_row(label: str, value: str) -> str:
+def _copy_row(label: str, value: str, sensitivity: str | None = None) -> str:
     safe_label = html.escape(label)
     safe_value = html.escape(value)
+    badge = ""
+    if sensitivity:
+        safe_sensitivity = html.escape(sensitivity)
+        badge_class = "text-bg-warning" if sensitivity.lower() == "secret" else "text-bg-secondary"
+        badge = f'<span class="badge {badge_class} rounded-pill">{safe_sensitivity}</span>'
     return f"""
     <div class="input-group copy-field">
-      <span class="input-group-text">{safe_label}</span>
+      <span class="input-group-text copy-label"><span>{safe_label}</span>{badge}</span>
       <code class="form-control text-truncate">{safe_value}</code>
       <button type="button" class="btn btn-outline-secondary text-primary" data-copy="{safe_value}" aria-label="Copy {safe_label}">Copy</button>
+    </div>
+    """
+
+
+def _secret_notice() -> str:
+    return """
+    <div class="alert alert-info my-3 py-2 small" role="note">
+      <strong>Public:</strong> Domainnamen and CNAME target can be shared in DNS.
+      <strong>Secret:</strong> Update-URL, Kennwort, private status page, and domain claim links control the hostname.
     </div>
     """
 
@@ -900,13 +916,14 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
                 <p class="eyebrow">Router settings</p>
                 <h2>FRITZ!Box fields</h2>
                 <p class="section-copy">Use these values in the FRITZ!Box custom DynDNS provider fields. If you use your own DNS name, point it at this hostname with a CNAME.</p>
+                {_secret_notice()}
               </div>
               <div class="col-lg-6 d-grid gap-2">
-                {_copy_row("Update-URL:", update_url)}
-                {_copy_row("Domainnamen:", hostname)}
-                {_copy_row("CNAME target:", hostname)}
-                {_copy_row("Benutzername:", username)}
-                {_copy_row("Kennwort:", "unchanged; only shown when generated")}
+                {_copy_row("Update-URL:", update_url, "Secret")}
+                {_copy_row("Domainnamen:", hostname, "Public")}
+                {_copy_row("CNAME target:", hostname, "Public")}
+                {_copy_row("Benutzername:", username, "Public")}
+                {_copy_row("Kennwort:", "unchanged; only shown when generated", "Secret")}
               </div>
               </div>
             </div>
@@ -1272,6 +1289,7 @@ def _page(title: str, body: str) -> str:
           .eyebrow {{ color: var(--bs-primary); font-size: 13px; font-weight: 600; letter-spacing: 0; }}
           .lead {{ max-width: 660px; color: var(--rp-muted); font-size: 19px; line-height: 1.47; letter-spacing: -0.01em; }}
           .section-dark .lead, .section-dark .section-copy {{ color: #cccccc; }}
+          .section-dark .text-secondary {{ color: #cccccc !important; }}
           .section-copy, .intro {{ margin-top: 12px; max-width: 560px; color: var(--rp-muted); font-size: 15px; line-height: 1.5; }}
           .card {{ background: var(--rp-surface); border-color: var(--rp-line); border-radius: .75rem; }}
           .section-dark .card {{ background: var(--rp-dark-card); border-color: rgba(255, 255, 255, 0.14); color: #f5f5f7; }}
@@ -1285,6 +1303,7 @@ def _page(title: str, body: str) -> str:
           .btn:focus-visible, a:focus-visible, input:focus-visible {{ outline: 2px solid var(--bs-primary); outline-offset: 3px; }}
           .btn-light {{ --bs-btn-bg: var(--rp-surface-alt); --bs-btn-border-color: var(--rp-line); --bs-btn-color: var(--rp-ink); --bs-btn-hover-bg: var(--bs-tertiary-bg); --bs-btn-hover-border-color: var(--rp-line); --bs-btn-hover-color: var(--rp-ink); }}
           .copy-field .input-group-text {{ min-width: 150px; color: var(--rp-muted); font-size: 13px; }}
+          .copy-label {{ display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; }}
           .copy-field code {{ min-height: 44px; margin: 0; color: var(--rp-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.6; background: var(--bs-body-bg); }}
           .section-dark .copy-field code {{ color: #f5f5f7; background: #1d1d1f; }}
           .admin-table-scroll {{ max-height: 560px; overflow: auto; }}
