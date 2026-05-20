@@ -327,9 +327,8 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
 
     @app.post("/magic", response_class=HTMLResponse)
     async def magic_account(request: Request) -> str:
-        form = await _request_form(request, settings)
-        username = _first_form_value(form, "username") or None
-        account = await run_in_threadpool(service.create_managed_account, username)
+        await _request_form(request, settings)
+        account = await run_in_threadpool(service.create_managed_account, None)
         return _render_public_home(service, settings, account, None)
 
     @app.get("/m/{management_slug}", response_class=HTMLResponse)
@@ -401,16 +400,15 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
     async def self_service_account(request: Request) -> str:
         form = await _request_form(request, settings)
         mode = _first_form_value(form, "mode")
-        username = _first_form_value(form, "username") or None
         if mode == "managed":
-            account = await run_in_threadpool(service.create_managed_account, username)
+            account = await run_in_threadpool(service.create_managed_account, None)
         else:
             claim_secret = _first_form_value(form, "claim_secret")
             account = await run_in_threadpool(
                 service.create_custom_account,
                 _first_form_value(form, "hostname"),
                 claim_secret,
-                username,
+                None,
             )
         return _render_public_home(service, settings, account, None)
 
@@ -678,10 +676,7 @@ def _render_public_home(
                 </div>
               </div>
               <form method="post" action="/magic" class="col-lg-5 card card-body gap-3" aria-label="Create a generated DynDNS hostname">
-                <label>Router login name <span class="text-secondary fw-normal">(optional)</span>
-                  <input class="form-control" name="username" placeholder="optional" autocomplete="off" inputmode="text">
-                  <span class="form-text m-0">This becomes the FRITZ!Box Benutzername. Leave empty to generate one automatically.</span>
-                </label>
+                <p class="section-copy mb-0">KarlDNS generates the hostname, secret update URL, and optional router compatibility credentials automatically.</p>
                 <button type="submit" class="btn btn-primary rounded-pill">Generate hostname</button>
               </form>
               </div>
@@ -775,10 +770,7 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
                 <label>Verified hostname
                   <input class="form-control" name="hostname" placeholder="home.example.com" autocomplete="off" autocapitalize="none" spellcheck="false" required>
                 </label>
-                <label>Router login name <span class="text-secondary fw-normal">(optional)</span>
-                  <input class="form-control" name="username" placeholder="optional" autocomplete="off">
-                  <span class="form-text m-0">This becomes the FRITZ!Box Benutzername. Leave empty to generate one automatically.</span>
-                </label>
+                <p class="section-copy mb-0">Router compatibility credentials are generated automatically after creation.</p>
                 <button type="submit" class="btn btn-primary rounded-pill">Create credentials</button>
               </form>
             </div>

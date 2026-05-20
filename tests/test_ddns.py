@@ -391,7 +391,7 @@ def test_magic_hostname_without_login_generates_update_and_management_links(tmp_
     )
     client = TestClient(app)
 
-    response = client.post("/magic", data={"username": "alice"})
+    response = client.post("/magic")
 
     assert response.status_code == 200
     assert "Update-URL:" in response.text
@@ -558,7 +558,7 @@ def test_api_docs_include_versioned_ddns_api(tmp_path: Path) -> None:
     assert all(tag["name"] != "admin" for tag in schema["tags"])
 
 
-def test_public_home_hides_admin_link_and_explains_router_login(tmp_path: Path) -> None:
+def test_public_home_hides_admin_link_and_uses_automatic_router_login(tmp_path: Path) -> None:
     app = make_app(
         DdnsSettings(
             database_path=tmp_path / "ddns.sqlite3",
@@ -572,8 +572,9 @@ def test_public_home_hides_admin_link_and_explains_router_login(tmp_path: Path) 
 
     assert response.status_code == 200
     assert 'href="/admin"' not in response.text
-    assert "Router login name" in response.text
-    assert "FRITZ!Box Benutzername" in response.text
+    assert "Router login name" not in response.text
+    assert 'name="username"' not in response.text
+    assert "generates the hostname, secret update URL, and optional router compatibility credentials automatically" in response.text
 
 
 def test_application_pages_use_stricter_script_csp(tmp_path: Path) -> None:
