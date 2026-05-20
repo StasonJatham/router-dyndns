@@ -719,6 +719,7 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
         verification_name = service.verification_name(str(challenge["domain"]))
         claim_url = service.domain_claim_url(challenge)
         status = html.escape(message or "Add this TXT record at your DNS provider, then check when it has propagated.")
+        txt_bundle = f"TXT name: {verification_name}\nTXT value: {token}"
         challenge_html = f"""
         <div class="col-md-4">
         <div class="card card-body h-100 gap-3">
@@ -726,6 +727,7 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
           <h3>Add the TXT record</h3>
           <p class="small text-secondary mb-0 mt-2">{status}</p>
           <div class="alert alert-info mb-0 py-2 small">TXT name and value are public DNS records. The private claim link is secret.</div>
+          {_copy_button("Copy TXT record", txt_bundle)}
           {_copy_row("TXT name", verification_name, "Public")}
           {_copy_row("TXT value", token, "Public")}
           {_copy_row("Private claim link", claim_url, "Secret")}
@@ -808,6 +810,8 @@ def _credentials_panel(service: DdnsService, created_account: dict[str, str] | N
     password = created_account["password"]
     update_url = service.fritz_update_url(created_account)
     management_url = service.magic_management_url(created_account)
+    cname_record = f"your-subdomain.example.com. CNAME {hostname}."
+    fritzbox_fields = _fritzbox_fields(update_url, hostname, username, password, management_url)
     return f"""
     <section class="section success-section">
       <div class="container">
@@ -815,6 +819,10 @@ def _credentials_panel(service: DdnsService, created_account: dict[str, str] | N
         <h2>{html.escape(hostname)}</h2>
         <p class="section-copy">Save this now. The password and private status page are only shown on this screen. To use your own DNS name, create a CNAME from that name to this hostname.</p>
         {_secret_notice()}
+        <div class="d-flex gap-2 flex-wrap my-3">
+          {_copy_button("Copy FRITZ!Box fields", fritzbox_fields)}
+          {_copy_button("Copy CNAME record", cname_record)}
+        </div>
         <div class="d-grid gap-2">
           {_copy_row("Update-URL:", update_url, "Secret")}
           {_copy_row("Domainnamen:", hostname, "Public")}
@@ -860,6 +868,31 @@ def _copy_row(label: str, value: str, sensitivity: str | None = None) -> str:
     """
 
 
+def _copy_button(label: str, value: str) -> str:
+    safe_label = html.escape(label)
+    safe_value = html.escape(value)
+    return f'<button type="button" class="btn btn-outline-primary rounded-pill" data-copy="{safe_value}">{safe_label}</button>'
+
+
+def _fritzbox_fields(
+    update_url: str,
+    hostname: str,
+    username: str,
+    password: str,
+    management_url: str | None = None,
+) -> str:
+    lines = [
+        f"Update-URL: {update_url}",
+        f"Domainnamen: {hostname}",
+        f"CNAME target: {hostname}",
+        f"Benutzername: {username}",
+        f"Kennwort: {password}",
+    ]
+    if management_url:
+        lines.append(f"Private status page: {management_url}")
+    return "\n".join(lines)
+
+
 def _secret_notice() -> str:
     return """
     <div class="alert alert-info my-3 py-2 small" role="note">
@@ -893,6 +926,8 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
     ipv4 = html.escape(str(account.get("ipv4") or "-"))
     ipv6 = html.escape(str(account.get("ipv6") or "-"))
     updated = html.escape(str(account.get("updated_at") or "Never"))
+    fritzbox_fields = _fritzbox_fields(update_url, hostname, username, "unchanged; only shown when generated")
+    cname_record = f"your-subdomain.example.com. CNAME {hostname}."
     history_rows = "\n".join(_user_event_row(event) for event in service.store.list_update_events_for_hostname(str(account["hostname"]), 20)) or """
       <tr><td colspan="5" class="empty">No router updates yet.</td></tr>
     """
@@ -917,6 +952,10 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
                 <h2>FRITZ!Box fields</h2>
                 <p class="section-copy">Use these values in the FRITZ!Box custom DynDNS provider fields. If you use your own DNS name, point it at this hostname with a CNAME.</p>
                 {_secret_notice()}
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                  {_copy_button("Copy FRITZ!Box fields", fritzbox_fields)}
+                  {_copy_button("Copy CNAME record", cname_record)}
+                </div>
               </div>
               <div class="col-lg-6 d-grid gap-2">
                 {_copy_row("Update-URL:", update_url, "Secret")}
