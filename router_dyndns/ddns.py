@@ -519,9 +519,51 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
     def favicon() -> FileResponse:
         return FileResponse(ASSET_DIR / "favicon.ico", media_type="image/x-icon")
 
+    @app.get("/favicon-16x16.png", include_in_schema=False)
+    def favicon_16_png() -> FileResponse:
+        return FileResponse(ASSET_DIR / "favicon-16x16.png", media_type="image/png")
+
+    @app.get("/favicon-32x32.png", include_in_schema=False)
+    def favicon_32_png() -> FileResponse:
+        return FileResponse(ASSET_DIR / "favicon-32x32.png", media_type="image/png")
+
+    @app.get("/apple-touch-icon.png", include_in_schema=False)
+    def apple_touch_icon_png() -> FileResponse:
+        return FileResponse(ASSET_DIR / "apple-touch-icon.png", media_type="image/png")
+
     @app.get("/logo.png", include_in_schema=False)
     def logo_png() -> FileResponse:
         return FileResponse(ASSET_DIR / "logo.png", media_type="image/png")
+
+    @app.get("/logo-192.png", include_in_schema=False)
+    def logo_192_png() -> FileResponse:
+        return FileResponse(ASSET_DIR / "logo-192.png", media_type="image/png")
+
+    @app.get("/logo-512.png", include_in_schema=False)
+    def logo_512_png() -> FileResponse:
+        return FileResponse(ASSET_DIR / "logo-512.png", media_type="image/png")
+
+    @app.get("/site.webmanifest", include_in_schema=False)
+    def site_webmanifest() -> Response:
+        return Response(
+            """
+{
+  "name": "KarlDNS",
+  "short_name": "KarlDNS",
+  "description": "Accountless Dynamic DNS for routers and home labs.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {"src": "/logo-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/logo-512.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}
+""".strip(),
+            media_type="application/manifest+json",
+        )
 
     @app.get("/app.js", include_in_schema=False)
     def app_js() -> Response:
@@ -1318,9 +1360,13 @@ def _page(title: str, body: str) -> str:
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
         <title>{html.escape(title)}</title>
         <link rel="icon" href="/favicon.ico" sizes="any">
-        <link rel="apple-touch-icon" href="/logo.png">
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+        <link rel="manifest" href="/site.webmanifest">
         <script src="/app.js" defer></script>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
         <style>

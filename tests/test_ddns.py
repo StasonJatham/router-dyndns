@@ -609,6 +609,37 @@ def test_application_pages_use_stricter_script_csp(tmp_path: Path) -> None:
     assert client.get("/app.js").status_code == 200
 
 
+def test_web_icon_assets_and_manifest_are_exposed(tmp_path: Path) -> None:
+    app = make_app(DdnsSettings(database_path=tmp_path / "ddns.sqlite3", admin_password="admin"))
+    client = TestClient(app)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert 'href="/favicon.ico"' in response.text
+    assert 'href="/favicon-32x32.png"' in response.text
+    assert 'href="/favicon-16x16.png"' in response.text
+    assert 'href="/apple-touch-icon.png"' in response.text
+    assert 'href="/site.webmanifest"' in response.text
+    for path in [
+        "/favicon.ico",
+        "/favicon-32x32.png",
+        "/favicon-16x16.png",
+        "/apple-touch-icon.png",
+        "/logo-192.png",
+        "/logo-512.png",
+    ]:
+        asset = client.get(path)
+        assert asset.status_code == 200
+        assert asset.content
+    manifest = client.get("/site.webmanifest")
+    assert manifest.status_code == 200
+    assert manifest.json()["icons"] == [
+        {"src": "/logo-192.png", "sizes": "192x192", "type": "image/png"},
+        {"src": "/logo-512.png", "sizes": "512x512", "type": "image/png"},
+    ]
+
+
 def test_trusted_host_middleware_rejects_unlisted_host(tmp_path: Path) -> None:
     app = make_app(
         DdnsSettings(
