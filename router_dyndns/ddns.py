@@ -272,7 +272,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
                 """
                 <main>
                   <section class="hero-band compact">
-                    <div class="container hero-inner">
+                    <div class="container text-center d-grid justify-items-center gap-3">
                       <p class="eyebrow">Deleted</p>
                       <h1>Hostname deleted.</h1>
                       <p class="lead">The update URL no longer works.</p>
@@ -590,11 +590,11 @@ def _render_public_home(
         <main id="main">
           {_top_nav()}
           <section class="hero-band">
-            <div class="container hero-inner">
+            <div class="container text-center d-grid justify-items-center gap-3">
               <p class="eyebrow">FRITZ!Box compatible</p>
               <h1>DynDNS without signups.</h1>
               <p class="lead">Create a secure update endpoint under {suffix}. Provider hostnames are anonymous; custom domains require DNS proof.</p>
-              <div class="hero-actions">
+              <div class="d-flex gap-2 flex-wrap justify-content-center mt-2">
                 <a class="btn btn-primary rounded-pill" href="#create">Get a hostname</a>
                 <a class="btn btn-outline-primary rounded-pill" href="#custom-domain">Verify a domain</a>
               </div>
@@ -603,19 +603,21 @@ def _render_public_home(
           {message_html}
           {created_html}
           <section class="section" id="create">
-            <div class="container tool-grid">
-              <div>
+            <div class="container">
+              <div class="row g-4 align-items-start">
+              <div class="col-lg-7">
                 <p class="eyebrow">Free DynDNS hostname</p>
                 <h2>Create a router update URL</h2>
                 <p class="section-copy">Generate a random hostname, paste the update URL into your router, and keep the management link private.</p>
               </div>
-              <form method="post" action="/magic" class="tool-card" aria-label="Create a generated DynDNS hostname">
+              <form method="post" action="/magic" class="col-lg-5 card card-body gap-3" aria-label="Create a generated DynDNS hostname">
                 <label>Router username
                   <input class="form-control" name="username" placeholder="optional" autocomplete="off" inputmode="text">
                   <span class="field-hint">Leave empty to generate one automatically.</span>
                 </label>
                 <button type="submit" class="btn btn-primary rounded-pill">Generate hostname</button>
               </form>
+              </div>
             </div>
           </section>
           {challenge_html}
@@ -634,15 +636,15 @@ def _render_public_home(
 def _top_nav(label: str | None = None, links: str = "") -> str:
     account_html = ""
     if label:
-        account_html = f'<span class="nav-label">{html.escape(label)}</span>'
+        account_html = f'<span class="navbar-text text-truncate d-none d-sm-inline-block" style="max-width: 38vw;">{html.escape(label)}</span>'
     if not links:
-        account_html += '<a class="nav-button" href="/#custom-domain">Domain setup</a>'
+        account_html += '<a class="btn btn-sm btn-outline-secondary rounded-pill" href="/#custom-domain">Domain setup</a>'
     return f"""
     <a class="skip-link" href="#main">Skip to content</a>
-    <nav class="top-nav" aria-label="Main navigation">
-      <div class="container nav-inner">
+    <nav class="navbar navbar-expand-sm sticky-top navbar-blur border-bottom" aria-label="Main navigation">
+      <div class="container">
         <a class="navbar-brand brand" href="/"><img src="/logo.svg" alt="" width="28" height="28">router-dyndns</a>
-        <div class="nav-actions">
+        <div class="navbar-nav ms-auto flex-row align-items-center gap-2 gap-sm-3">
           {links}
           {account_html}
         </div>
@@ -662,7 +664,8 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
         claim_url = service.domain_claim_url(challenge)
         status = html.escape(message or "Add this TXT record at your DNS provider, then check when it has propagated.")
         challenge_html = f"""
-        <div class="step-card">
+        <div class="col-md-4">
+        <div class="card card-body h-100 gap-3">
           <span class="step-number">2</span>
           <h3>Add the TXT record</h3>
           <p class="note">{status}</p>
@@ -675,10 +678,12 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
             <button type="submit" class="btn btn-primary rounded-pill">Check DNS record</button>
           </form>
         </div>
+        </div>
         """
         if challenge.get("verified_at"):
             create_form = f"""
-            <div class="step-card">
+            <div class="col-md-4">
+            <div class="card card-body h-100 gap-3">
               <span class="step-number">3</span>
               <h3>Create router hostname</h3>
               <form method="post" action="/accounts" class="stack-form" aria-label="Create custom-domain router credentials">
@@ -694,28 +699,32 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
                 <button type="submit" class="btn btn-primary rounded-pill">Create credentials</button>
               </form>
             </div>
+            </div>
             """
         else:
             create_form = """
-            <div class="step-card muted-card">
+            <div class="col-md-4">
+            <div class="card card-body h-100 gap-3 opacity-75">
               <span class="step-number">3</span>
               <h3>Create router hostname</h3>
               <p class="note">This unlocks after the TXT record is visible in public DNS.</p>
+            </div>
             </div>
             """
 
     return f"""
     <section class="section section-dark" id="custom-domain">
       <div class="container">
-        <div class="section-heading">
+        <div class="d-flex align-items-md-center justify-content-between gap-4 flex-column flex-md-row">
           <div>
             <p class="eyebrow">Custom domain</p>
             <h2>Verify DNS ownership</h2>
             <p class="section-copy">We only issue router credentials after the DNS record proves you control the domain.</p>
           </div>
         </div>
-        <div class="step-grid">
-          <div class="step-card">
+        <div class="row g-3 mt-4">
+          <div class="col-md-4">
+          <div class="card card-body h-100 gap-3">
             <span class="step-number">1</span>
             <h3>Enter domain</h3>
             <form method="post" action="/request-domain" class="stack-form" aria-label="Request a custom domain TXT challenge">
@@ -724,6 +733,7 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
               </label>
               <button type="submit" class="btn btn-primary rounded-pill">Create TXT challenge</button>
             </form>
+          </div>
           </div>
           {challenge_html}
           {create_form}
@@ -782,10 +792,10 @@ def _copy_row(label: str, value: str) -> str:
     safe_label = html.escape(label)
     safe_value = html.escape(value)
     return f"""
-    <div class="copy-row">
-      <span>{safe_label}</span>
-      <code>{safe_value}</code>
-      <button type="button" class="btn btn-sm btn-light copy-button" data-copy="{safe_value}" aria-label="Copy {safe_label}">Copy</button>
+    <div class="input-group copy-field">
+      <span class="input-group-text">{safe_label}</span>
+      <code class="form-control text-truncate">{safe_value}</code>
+      <button type="button" class="btn btn-outline-secondary copy-button" data-copy="{safe_value}" aria-label="Copy {safe_label}">Copy</button>
     </div>
     """
 
@@ -794,9 +804,9 @@ def _message_band(message: str | None) -> str:
     if not message:
         return ""
     return f"""
-    <section class="message-band">
-      <div class="container"><p>{html.escape(message)}</p></div>
-    </section>
+    <div class="alert alert-warning mb-0 rounded-0 border-start-0 border-end-0" role="status">
+      <div class="container">{html.escape(message)}</div>
+    </div>
     """
 
 
@@ -823,7 +833,7 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
         <main id="main">
           {_top_nav()}
           <section class="hero-band compact">
-            <div class="container hero-inner">
+            <div class="container text-center d-grid justify-items-center gap-3">
               <p class="eyebrow">Magic management</p>
               <h1>{hostname}</h1>
               <p class="lead">Anyone with this link can manage or delete this hostname. Keep it private.</p>
@@ -831,22 +841,24 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
             </div>
           </section>
           <section class="section">
-            <div class="container tool-grid">
-              <div>
+            <div class="container">
+              <div class="row g-4 align-items-start">
+              <div class="col-lg-6">
                 <p class="eyebrow">Router settings</p>
                 <h2>FRITZ!Box fields</h2>
                 <p class="section-copy">Use these values in the FRITZ!Box custom DynDNS provider fields.</p>
               </div>
-              <div class="copy-list">
+              <div class="col-lg-6 copy-list">
                 {_copy_row("Update-URL:", update_url)}
                 {_copy_row("Domainnamen:", hostname)}
                 {_copy_row("Benutzername:", username)}
                 {_copy_row("Kennwort:", "unchanged; only shown when generated")}
               </div>
+              </div>
             </div>
           </section>
           <section class="section">
-            <div class="container split-row">
+            <div class="container d-flex align-items-md-center justify-content-between gap-4 flex-column flex-md-row">
               <div>
                 <p class="eyebrow">Current address</p>
                 <h2>Status</h2>
@@ -862,15 +874,15 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
           </section>
           <section class="section">
             <div class="container">
-              <div class="section-heading">
+              <div class="d-flex align-items-md-center justify-content-between gap-4 flex-column flex-md-row">
                 <div>
                   <p class="eyebrow">History</p>
                   <h2>Router updates</h2>
                   <p class="section-copy">Recent IP changes and failed DNS publishes for this hostname.</p>
                 </div>
               </div>
-              <div class="table-wrap">
-                <table class="table">
+              <div class="table-responsive border rounded">
+                <table class="table mb-0">
                   <thead><tr><th>Time</th><th>Status</th><th>IPv4</th><th>IPv6</th><th>Detail</th></tr></thead>
                   <tbody>{history_rows}</tbody>
                 </table>
@@ -878,7 +890,7 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
             </div>
           </section>
           <section class="section danger-section">
-            <div class="container split-row">
+            <div class="container d-flex align-items-md-center justify-content-between gap-4 flex-column flex-md-row">
               <div>
                 <p class="eyebrow">Danger zone</p>
                 <h2>Delete hostname</h2>
@@ -926,7 +938,7 @@ def _render_admin_page(
         "DynDNS Admin",
         f"""
         <main id="main">
-          {_top_nav("Operator console", '<a href="/records">Records</a><a href="/events">Events</a>')}
+          {_top_nav("Operator console", '<a class="nav-link px-0" href="/records">Records</a><a class="nav-link px-0" href="/events">Events</a>')}
           <section class="section admin-heading">
             <div class="container">
               <p class="eyebrow">DynDNS aktiv</p>
@@ -939,28 +951,31 @@ def _render_admin_page(
           {notice_html or ""}
 
           <section class="section">
-            <div class="container tool-grid">
-              <div>
+            <div class="container">
+              <div class="row g-4 align-items-start">
+              <div class="col-lg-7">
                 <p class="eyebrow">Service health</p>
                 <h2>Scheduled cleanup</h2>
                 <p class="section-copy">Cleanup runs every {html.escape(str(settings.cleanup_interval_seconds))} seconds. It removes unverified domain claims after {html.escape(str(settings.cleanup_challenge_hours))} hours and never-used generated hostnames after {html.escape(str(settings.cleanup_unused_account_hours))} hours.</p>
               </div>
-              <form method="post" action="/admin/cleanup" class="tool-card" aria-label="Run cleanup now">
+              <form method="post" action="/admin/cleanup" class="col-lg-5 card card-body gap-3" aria-label="Run cleanup now">
                 <input type="hidden" name="csrf" value="{csrf}">
                 <button type="submit" class="btn btn-primary rounded-pill">Run cleanup now</button>
               </form>
+              </div>
             </div>
           </section>
 
           <section class="section">
-            <div class="container tool-grid">
-              <div>
+            <div class="container">
+              <div class="row g-4 align-items-start">
+              <div class="col-lg-7">
                 <p class="eyebrow">Generate credentials</p>
                 <h2>Router credentials</h2>
                 <p class="section-copy">Generated credentials produce the FRITZ!Box fields: Update-URL, Domainnamen, Benutzername, Kennwort.</p>
                 <p class="note">{suffix_help}</p>
               </div>
-              <form method="post" action="/admin/accounts" class="tool-card" aria-label="Create router credentials">
+              <form method="post" action="/admin/accounts" class="col-lg-5 card card-body gap-3" aria-label="Create router credentials">
                 <input type="hidden" name="csrf" value="{csrf}">
                 <label>Domainnamen
                   <input class="form-control" name="hostname" placeholder="home.example.net" autocomplete="off" autocapitalize="none" spellcheck="false" required>
@@ -971,19 +986,20 @@ def _render_admin_page(
                 </label>
                 <button type="submit" class="btn btn-primary rounded-pill">Generate credentials</button>
               </form>
+              </div>
             </div>
           </section>
 
           <section class="section">
             <div class="container">
-              <div class="section-heading">
+              <div class="d-flex align-items-md-center justify-content-between gap-4 flex-column flex-md-row">
                 <div>
                   <p class="eyebrow">Hostnames</p>
                   <h2>Active credentials</h2>
                 </div>
               </div>
-              <div class="table-wrap">
-                <table class="table">
+              <div class="table-responsive border rounded">
+                <table class="table mb-0">
                   <thead>
                     <tr><th>Domain</th><th>User</th><th>IPv4</th><th>IPv6</th><th>Updated</th><th>Links</th><th></th></tr>
                   </thead>
@@ -995,14 +1011,14 @@ def _render_admin_page(
 
           <section class="section">
             <div class="container">
-              <div class="section-heading">
+              <div class="d-flex align-items-md-center justify-content-between gap-4 flex-column flex-md-row">
                 <div>
                   <p class="eyebrow">Domain claims</p>
                   <h2>Verification lifecycle</h2>
                 </div>
               </div>
-              <div class="table-wrap">
-                <table class="table">
+              <div class="table-responsive border rounded">
+                <table class="table mb-0">
                   <thead><tr><th>Domain</th><th>Status</th><th>Created</th><th>Verified</th></tr></thead>
                   <tbody>{domain_rows}</tbody>
                 </table>
@@ -1012,14 +1028,14 @@ def _render_admin_page(
 
           <section class="section">
             <div class="container">
-              <div class="section-heading">
+              <div class="d-flex align-items-md-center justify-content-between gap-4 flex-column flex-md-row">
                 <div>
                   <p class="eyebrow">Cleanup</p>
                   <h2>Recent runs</h2>
                 </div>
               </div>
-              <div class="table-wrap">
-                <table class="table">
+              <div class="table-responsive border rounded">
+                <table class="table mb-0">
                   <thead><tr><th>Time</th><th>Domain claims removed</th><th>Unused hostnames removed</th></tr></thead>
                   <tbody>{cleanup_rows}</tbody>
                 </table>
@@ -1029,14 +1045,14 @@ def _render_admin_page(
 
           <section class="section">
             <div class="container">
-              <div class="section-heading">
+              <div class="d-flex align-items-md-center justify-content-between gap-4 flex-column flex-md-row">
                 <div>
                   <p class="eyebrow">Updates</p>
                   <h2>Recent events</h2>
                 </div>
               </div>
-              <div class="table-wrap">
-                <table class="table">
+              <div class="table-responsive border rounded">
+                <table class="table mb-0">
                   <thead><tr><th>Time</th><th>Domain</th><th>Status</th><th>IPv4</th><th>IPv6</th><th>Detail</th></tr></thead>
                   <tbody>{event_rows}</tbody>
                 </table>
@@ -1168,30 +1184,22 @@ def _page(title: str, body: str) -> str:
             color: var(--rp-ink);
             font: 400 16px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
           }}
-          .container {{ width: min(1040px, calc(100% - 40px)); margin: 0 auto; }}
+          .container {{ max-width: 1040px; }}
           .skip-link {{ position: fixed; left: 16px; top: 10px; z-index: 40; transform: translateY(-140%); padding: 10px 14px; border-radius: 999px; background: var(--rp-ink); color: var(--rp-bg); text-decoration: none; font-size: 14px; transition: transform .16s ease; }}
           .skip-link:focus {{ transform: translateY(0); }}
-          .top-nav {{ position: sticky; top: 0; z-index: 20; min-height: 52px; display: flex; align-items: center; background: var(--rp-nav-bg); border-bottom: 1px solid var(--rp-soft-line); backdrop-filter: saturate(180%) blur(20px); }}
-          .nav-inner {{ min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }}
-          .brand {{ display: inline-flex; align-items: center; gap: 9px; color: var(--rp-ink); font-size: 15px; font-weight: 650; letter-spacing: -0.01em; text-decoration: none; white-space: nowrap; }}
+          .navbar-blur {{ min-height: 52px; background: var(--rp-nav-bg); backdrop-filter: saturate(180%) blur(20px); }}
+          .brand {{ display: inline-flex; align-items: center; gap: 9px; color: var(--rp-ink); font-size: 15px; font-weight: 650; letter-spacing: -0.01em; white-space: nowrap; }}
           .brand:hover {{ color: var(--rp-ink); }}
           .brand img {{ width: 28px; height: 28px; display: block; }}
-          .nav-actions {{ min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 14px; }}
-          .nav-actions a:not(.nav-button) {{ color: var(--rp-muted); font-size: 13px; text-decoration: none; white-space: nowrap; }}
-          .nav-actions a:not(.nav-button):hover {{ color: var(--rp-ink); }}
-          .nav-label {{ min-width: 0; max-width: 38vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rp-muted); font-size: 13px; }}
-          .nav-button {{ min-height: 34px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--rp-line); border-radius: 999px; background: var(--rp-surface-alt); color: var(--rp-ink); font: inherit; font-size: 13px; font-weight: 500; text-decoration: none; cursor: pointer; }}
-          .nav-button:hover {{ background: var(--bs-tertiary-bg); color: var(--rp-ink); }}
+          .navbar .nav-link, .navbar-text {{ color: var(--rp-muted); font-size: 13px; }}
+          .navbar .nav-link:hover {{ color: var(--rp-ink); }}
           .hero-band {{ min-height: calc(70vh - 52px); display: grid; align-items: center; background: var(--rp-bg); text-align: center; padding: 80px 0 72px; }}
           .hero-band.compact {{ min-height: 360px; }}
-          .hero-inner {{ display: grid; justify-items: center; gap: 18px; }}
           .section {{ padding: 68px 0; background: var(--rp-surface); }}
           .section + .section {{ border-top: 1px solid var(--rp-soft-line); }}
           .section-dark {{ background: var(--rp-dark); color: #f5f5f7; border-top: 0; }}
           .success-section {{ background: var(--rp-bg); }}
           .danger-section {{ background: var(--rp-surface); border-top: 1px solid var(--rp-soft-line); }}
-          .message-band {{ background: var(--bs-warning-bg-subtle); color: var(--rp-ink); padding: 18px 0; border-block: 1px solid var(--bs-warning-border-subtle); }}
-          .split-row, .section-heading {{ display: flex; align-items: center; justify-content: space-between; gap: 24px; }}
           .page-heading, .admin-heading .container {{ max-width: 760px; }}
           .button-row {{ display: flex; gap: 10px; flex-wrap: wrap; }}
           h1, h2, h3, p {{ margin: 0; }}
@@ -1202,13 +1210,8 @@ def _page(title: str, body: str) -> str:
           .lead {{ max-width: 660px; color: var(--rp-muted); font-size: 19px; line-height: 1.47; letter-spacing: -0.01em; }}
           .section-dark .lead, .section-dark .section-copy, .section-dark .note {{ color: #cccccc; }}
           .section-copy, .intro {{ margin-top: 12px; max-width: 560px; color: var(--rp-muted); font-size: 15px; line-height: 1.5; }}
-          .hero-actions {{ display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }}
-          .tool-grid {{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 440px); gap: 40px; align-items: start; }}
-          .tool-card, .step-card, .secondary-card {{ display: grid; gap: 16px; padding: 24px; background: var(--rp-surface); border: 1px solid var(--rp-line); border-radius: .75rem; }}
-          .secondary-card {{ background: var(--rp-surface-alt); }}
-          .section-dark .step-card {{ background: var(--rp-dark-card); border-color: rgba(255, 255, 255, 0.14); }}
-          .section-dark .muted-card {{ opacity: .66; }}
-          .step-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 28px; }}
+          .card {{ background: var(--rp-surface); border-color: var(--rp-line); border-radius: .75rem; }}
+          .section-dark .card {{ background: var(--rp-dark-card); border-color: rgba(255, 255, 255, 0.14); color: #f5f5f7; }}
           .stack-form {{ display: grid; gap: 16px; }}
           .inline-form {{ margin-top: 14px; }}
           label {{ display: grid; gap: 8px; color: var(--rp-muted); font-size: 13px; font-weight: 500; }}
@@ -1222,14 +1225,11 @@ def _page(title: str, body: str) -> str:
           .danger-button {{ color: var(--rp-danger); }}
           .note {{ margin-top: 10px; color: var(--rp-muted); font-size: 13px; line-height: 1.45; }}
           .copy-list {{ display: grid; gap: 10px; }}
-          .copy-row {{ display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 48px; padding: 10px 10px 10px 14px; background: var(--rp-surface); border: 1px solid var(--rp-line); border-radius: .5rem; }}
-          .copy-row span {{ color: var(--rp-muted); font-size: 13px; }}
-          .copy-row code {{ min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rp-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }}
+          .copy-field .input-group-text {{ min-width: 150px; color: var(--rp-muted); font-size: 13px; }}
+          .copy-field code {{ min-height: 44px; margin: 0; color: var(--rp-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.6; background: var(--bs-body-bg); }}
           .copy-button {{ min-height: 32px; padding: 0 12px; border-radius: 999px; color: var(--bs-primary); font-size: 13px; }}
-          .section-dark .copy-row {{ background: #1d1d1f; border-color: rgba(255, 255, 255, 0.14); }}
-          .section-dark .copy-row code {{ color: #f5f5f7; }}
+          .section-dark .copy-field code {{ color: #f5f5f7; background: #1d1d1f; }}
           .step-number {{ width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: var(--bs-primary); color: white; border-radius: 50%; font-size: 13px; }}
-          .table-wrap {{ overflow-x: auto; border: 1px solid var(--rp-line); border-radius: .5rem; }}
           table {{ width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--rp-ink); }}
           th, td {{ border-bottom: 1px solid var(--rp-soft-line); padding: 14px 10px; text-align: left; white-space: nowrap; }}
           tr:last-child th, tr:last-child td {{ border-bottom: 0; }}
@@ -1243,27 +1243,20 @@ def _page(title: str, body: str) -> str:
           .footer-links a {{ color: var(--rp-muted); font-size: 13px; text-decoration: none; }}
           .footer-links a:hover {{ color: var(--rp-ink); }}
           @media (max-width: 860px) {{
-            .tool-grid, .step-grid {{ grid-template-columns: 1fr; }}
-            .split-row, .section-heading {{ align-items: flex-start; flex-direction: column; }}
             .section, .hero-band {{ padding: 52px 0; }}
             .hero-band {{ min-height: auto; }}
             h1 {{ font-size: 36px; }}
             .lead {{ font-size: 17px; }}
           }}
           @media (max-width: 560px) {{
-            .container {{ width: min(100% - 28px, 1040px); }}
-            .nav-inner {{ gap: 10px; }}
-            .nav-actions {{ gap: 8px; }}
-            .nav-label {{ display: none; }}
             .brand {{ font-size: 14px; }}
             .brand img {{ width: 24px; height: 24px; }}
-            .hero-actions, .button-row {{ width: 100%; flex-direction: column; }}
-            .hero-actions .btn, .tool-card button, .step-card button, .danger-button {{ width: 100%; }}
-            .tool-card, .step-card, .secondary-card {{ padding: 18px; }}
-            .copy-row {{ grid-template-columns: 1fr; }}
-            .copy-row code {{ white-space: normal; overflow-wrap: anywhere; }}
+            .button-row {{ width: 100%; flex-direction: column; }}
+            .hero-band .btn, .card button, .danger-button {{ width: 100%; }}
+            .copy-field {{ display: grid; }}
+            .copy-field .input-group-text {{ min-width: 0; border-radius: .5rem .5rem 0 0; }}
+            .copy-field code {{ white-space: normal; overflow-wrap: anywhere; border-radius: 0; }}
             .copy-button {{ width: 100%; }}
-            .table-wrap {{ margin-inline: -4px; }}
             th, td {{ padding: 12px 9px; }}
             h1 {{ font-size: 31px; }}
             h2 {{ font-size: 25px; }}
