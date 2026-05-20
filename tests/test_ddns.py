@@ -344,7 +344,7 @@ def test_admin_can_rotate_links_and_password(tmp_path: Path) -> None:
     assert "Router password rotated" in password.text
     assert "One-box update URL:" in password.text
     assert "/nic/update?" in password.text
-    assert "Kennwort:" in password.text
+    assert "Kennwort (optional):" in password.text
 
 
 def test_self_service_managed_hostname_generates_random_account(tmp_path: Path) -> None:
@@ -364,7 +364,9 @@ def test_self_service_managed_hostname_generates_random_account(tmp_path: Path) 
     assert "Update-URL:" in response.text
     assert "One-box update URL:" in response.text
     assert "CNAME target:" in response.text
-    assert "Copy FRITZ!Box fields" in response.text
+    assert "Benutzername (optional):" in response.text
+    assert "Kennwort (optional):" in response.text
+    assert "Copy complete FRITZ!Box fields" in response.text
     assert "Copy CNAME record" in response.text
     assert "Public:" in response.text
     assert "Secret:" in response.text
@@ -391,8 +393,10 @@ def test_magic_hostname_without_login_generates_update_and_management_links(tmp_
     assert "Update-URL:" in response.text
     assert "One-box update URL:" in response.text
     assert "CNAME target:" in response.text
+    assert "Benutzername (optional):" in response.text
+    assert "Kennwort (optional):" in response.text
     assert "Private status page:" in response.text
-    assert "Copy FRITZ!Box fields" in response.text
+    assert "Copy complete FRITZ!Box fields" in response.text
     assert "Copy CNAME record" in response.text
     assert response.text.count("Secret") >= 3
     assert response.text.count("Public") >= 3
@@ -420,7 +424,9 @@ def test_magic_management_link_can_delete_hostname(tmp_path: Path) -> None:
     assert management.status_code == 200
     assert "home.ddns.example.net" in management.text
     assert "CNAME target:" in management.text
-    assert "Copy FRITZ!Box fields" in management.text
+    assert "Benutzername (optional):" in management.text
+    assert "Kennwort (optional):" in management.text
+    assert "Copy complete FRITZ!Box fields" in management.text
     assert "Copy CNAME record" in management.text
     assert "Public:" in management.text
     assert "Secret:" in management.text

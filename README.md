@@ -144,13 +144,15 @@ export DDNS_TTL=60
 
 ## FRITZ!Box DynDNS Setup
 
-Create a hostname in the web UI. RouterPulse shows the exact values for:
+Create a hostname in the web UI. For the normal accountless flow, the generated `Update-URL` already contains the secret update slug. Put that URL into the router and use the generated hostname as `Domainnamen`.
+
+RouterPulse also shows optional compatibility fields for routers that insist on separate credentials:
 
 - `Update-URL`
 - `Domainnamen`
 - `CNAME target`
-- `Benutzername`
-- `Kennwort`
+- `Benutzername` (optional)
+- `Kennwort` (optional)
 
 The generated FRITZ!Box URL uses the native placeholders:
 
@@ -158,7 +160,7 @@ The generated FRITZ!Box URL uses the native placeholders:
 https://ddns.example.net/u/<random-update-slug>?myip=<ipaddr>&myipv6=<ip6addr>
 ```
 
-This URL is enough for routers that only expose a single update URL field. RouterPulse also shows a `One-box update URL` that embeds `hostname`, `username`, and `password` as query parameters for clients that require credential-style DynDNS URLs but do not expose separate credential fields. Treat both URLs as secrets.
+This URL is enough for routers that only expose a single update URL field and do not send separate credentials. RouterPulse also shows a `One-box update URL` that embeds `hostname`, `username`, and `password` as query parameters for clients that require credential-style DynDNS URLs but do not expose separate credential fields. Treat both URLs as secrets.
 
 The compatibility endpoint is also available:
 

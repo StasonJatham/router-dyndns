@@ -463,8 +463,8 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
                     [
                         _copy_row("Domainnamen:", str(rotated["hostname"]), "Public"),
                         _copy_row("One-box update URL:", service.credentialed_update_url(rotated), "Secret"),
-                        _copy_row("Benutzername:", str(rotated["username"]), "Public"),
-                        _copy_row("Kennwort:", str(rotated["password"]), "Secret"),
+                        _copy_row("Benutzername (optional):", str(rotated["username"]), "Public"),
+                        _copy_row("Kennwort (optional):", str(rotated["password"]), "Secret"),
                     ],
                 )
         else:
@@ -820,12 +820,12 @@ def _credentials_panel(service: DdnsService, created_account: dict[str, str] | N
     return f"""
     <section class="section success-section">
       <div class="container">
-        <p class="eyebrow">Credentials generated</p>
+        <p class="eyebrow">Hostname generated</p>
         <h2>{html.escape(hostname)}</h2>
-        <p class="section-copy">Save this now. The password, private status page, and one-box update URL are only shown on this screen. To use your own DNS name, create a CNAME from that name to this hostname.</p>
+        <p class="section-copy">Use the Update-URL directly. The separate Benutzername and Kennwort values are optional compatibility fields for routers that require them. Save this now: the password, private status page, and one-box update URL are only shown on this screen.</p>
         {_secret_notice()}
         <div class="d-flex gap-2 flex-wrap my-3">
-          {_copy_button("Copy FRITZ!Box fields", fritzbox_fields)}
+          {_copy_button("Copy complete FRITZ!Box fields", fritzbox_fields)}
           {_copy_button("Copy one-box update URL", credentialed_update_url)}
           {_copy_button("Copy CNAME record", cname_record)}
         </div>
@@ -834,8 +834,8 @@ def _credentials_panel(service: DdnsService, created_account: dict[str, str] | N
           {_copy_row("One-box update URL:", credentialed_update_url, "Secret")}
           {_copy_row("Domainnamen:", hostname, "Public")}
           {_copy_row("CNAME target:", hostname, "Public")}
-          {_copy_row("Benutzername:", username, "Public")}
-          {_copy_row("Kennwort:", password, "Secret")}
+          {_copy_row("Benutzername (optional):", username, "Public")}
+          {_copy_row("Kennwort (optional):", password, "Secret")}
           {_copy_row("Private status page:", management_url, "Secret")}
         </div>
       </div>
@@ -904,7 +904,7 @@ def _secret_notice() -> str:
     return """
     <div class="alert alert-info my-3 py-2 small" role="note">
       <strong>Public:</strong> Domainnamen and CNAME target can be shared in DNS.
-      <strong>Secret:</strong> Update-URL, one-box update URL, Kennwort, private status page, and domain claim links control the hostname.
+      <strong>Secret:</strong> Update-URL, one-box update URL, optional Kennwort, private status page, and domain claim links control the hostname.
     </div>
     """
 
@@ -956,11 +956,11 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
               <div class="row g-4 align-items-start">
               <div class="col-lg-6">
                 <p class="eyebrow">Router settings</p>
-                <h2>FRITZ!Box fields</h2>
-                <p class="section-copy">Use the Update-URL directly if your router only has one URL field. The username and password are shown only when generated or rotated. If you use your own DNS name, point it at this hostname with a CNAME.</p>
+                <h2>Router update settings</h2>
+                <p class="section-copy">Use the Update-URL directly if your router only has one URL field. Separate Benutzername and Kennwort values are optional compatibility fields and are only shown when generated or rotated. If you use your own DNS name, point it at this hostname with a CNAME.</p>
                 {_secret_notice()}
                 <div class="d-flex gap-2 flex-wrap mt-3">
-                  {_copy_button("Copy FRITZ!Box fields", fritzbox_fields)}
+                  {_copy_button("Copy complete FRITZ!Box fields", fritzbox_fields)}
                   {_copy_button("Copy CNAME record", cname_record)}
                 </div>
               </div>
@@ -968,8 +968,8 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
                 {_copy_row("Update-URL:", update_url, "Secret")}
                 {_copy_row("Domainnamen:", hostname, "Public")}
                 {_copy_row("CNAME target:", hostname, "Public")}
-                {_copy_row("Benutzername:", username, "Public")}
-                {_copy_row("Kennwort:", "unchanged; only shown when generated", "Secret")}
+                {_copy_row("Benutzername (optional):", username, "Public")}
+                {_copy_row("Kennwort (optional):", "unchanged; only shown when generated", "Secret")}
               </div>
               </div>
             </div>
