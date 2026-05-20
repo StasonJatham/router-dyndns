@@ -835,7 +835,8 @@ def _credentials_panel(service: DdnsService, created_account: dict[str, str] | N
       <div class="container">
         <p class="eyebrow">Hostname generated</p>
         <h2>{html.escape(hostname)}</h2>
-        <p class="section-copy">Use the Update-URL directly. The separate Benutzername and Kennwort values are optional compatibility fields for routers that require them. Save this now: the password, private status page, and one-box update URL are only shown on this screen.</p>
+        <p class="section-copy">Use the Update-URL directly. The separate Benutzername and Kennwort values are optional compatibility fields for routers that require them.</p>
+        {_one_time_secret_notice()}
         {_secret_notice()}
         <div class="d-flex gap-2 flex-wrap my-3">
           {_copy_button("Copy complete FRITZ!Box fields", fritzbox_fields)}
@@ -948,6 +949,14 @@ def _secret_notice() -> str:
     """
 
 
+def _one_time_secret_notice() -> str:
+    return """
+    <div class="alert alert-warning my-3 py-2 small" role="alert">
+      Copy the router password and one-box update URL now. They are only shown when generated or rotated and are not recoverable from the dashboard later.
+    </div>
+    """
+
+
 def _message_band(message: str | None) -> str:
     if not message:
         return ""
@@ -997,7 +1006,8 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
               <div class="col-lg-6">
                 <p class="eyebrow">Router settings</p>
                 <h2>Router update settings</h2>
-                <p class="section-copy">Use the Update-URL directly if your router only has one URL field. Separate Benutzername and Kennwort values are optional compatibility fields and are only shown when generated or rotated. If you use your own DNS name, point it at this hostname with a CNAME.</p>
+                <p class="section-copy">Use the Update-URL directly if your router only has one URL field. Separate Benutzername and Kennwort values are optional compatibility fields. If you use your own DNS name, point it at this hostname with a CNAME.</p>
+                {_one_time_secret_notice()}
                 {_secret_notice()}
                 <div class="d-flex gap-2 flex-wrap mt-3">
                   {_copy_button("Copy complete FRITZ!Box fields", fritzbox_fields)}

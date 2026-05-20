@@ -154,6 +154,8 @@ KarlDNS also shows optional compatibility fields for routers that insist on sepa
 - `Benutzername` (optional)
 - `Kennwort` (optional)
 
+Copy the router password and one-box update URL when they are generated or rotated. They are intentionally not recoverable from the dashboard later.
+
 The generated FRITZ!Box URL uses the native placeholders:
 
 ```text
