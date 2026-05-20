@@ -178,6 +178,8 @@ Put the RouterPulse `Update-URL`, `Domainnamen`, `Benutzername`, and `Kennwort` 
 
 Use a subdomain such as `home.example.com`. Root/apex domains like `example.com` usually cannot be plain CNAME records unless your DNS provider supports CNAME flattening or ALIAS/ANAME records.
 
+The generated hostname is not a secret. Treat it like any public DNS name. The update URL slug, router password, private status page URL, and domain claim link are the secrets.
+
 ## Custom Domain Flow
 
 This flow is only needed when RouterPulse should publish A/AAAA records directly inside a user-owned domain instead of using a CNAME target.
@@ -274,6 +276,6 @@ Self-hosted DynDNS, self hosted DDNS, Dynamic DNS server, FRITZ!Box DynDNS, FRIT
 
 ## Security
 
-The repository intentionally contains only placeholders in `.env.example` and documentation. Do not commit a real `.env`, DNS token, TSIG secret, admin password, database, private status page URL, domain claim URL, or router-generated update URL.
+The repository intentionally contains only placeholders in `.env.example` and documentation. Do not commit a real `.env`, DNS token, TSIG secret, admin password, database, private status page URL, domain claim URL, or router-generated update URL. Generated hostnames and CNAME targets are public identifiers, not authentication secrets.
 
 If you find a vulnerability, open a private advisory or contact the repository owner before publishing details.

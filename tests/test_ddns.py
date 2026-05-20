@@ -96,6 +96,25 @@ def test_generated_account_can_update_own_hostname(tmp_path: Path) -> None:
     assert slug_response.text == "good 203.0.113.10"
 
 
+def test_generated_hostname_is_not_an_update_secret(tmp_path: Path) -> None:
+    database_path = tmp_path / "ddns.sqlite3"
+    store = DdnsStore(database_path)
+    store.create_account("public-target.ddns.example.net", "alice")
+    app = make_app(DdnsSettings(database_path=database_path, admin_password="admin"))
+    client = TestClient(app)
+
+    response = client.get(
+        "/nic/update",
+        params={
+            "hostname": "public-target.ddns.example.net",
+            "myip": "203.0.113.9",
+        },
+    )
+
+    assert response.status_code == 401
+    assert store.list_records() == []
+
+
 def test_dns_publish_failure_does_not_update_record(tmp_path: Path, monkeypatch) -> None:
     def fail_publish(result, settings):
         raise RuntimeError("dns down")
