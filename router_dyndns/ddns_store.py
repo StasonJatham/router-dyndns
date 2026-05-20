@@ -332,6 +332,21 @@ class DdnsStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def list_update_events_for_hostname(self, hostname: str, limit: int = 25) -> list[dict[str, str | None]]:
+        with self.connect() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT hostname, ipv4, ipv6, status, detail, source_ip, created_at
+                FROM update_events
+                WHERE hostname = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (hostname, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def list_cleanup_runs(self, limit: int = 20) -> list[dict[str, str | int]]:
         with self.connect() as conn:
             conn.row_factory = sqlite3.Row

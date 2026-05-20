@@ -392,7 +392,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
             notice = _admin_secret_panel("Update URL rotated", [_copy_row("Update-URL:", service.fritz_update_url(rotated))]) if rotated else None
         elif action == "management":
             rotated = store.rotate_management_slug(hostname)
-            notice = _admin_secret_panel("Management link rotated", [_copy_row("Magic management link:", service.magic_management_url(rotated))]) if rotated else None
+            notice = _admin_secret_panel("Private status page rotated", [_copy_row("Private status page:", service.magic_management_url(rotated))]) if rotated else None
         elif action == "password":
             rotated = store.rotate_password(hostname)
             if rotated:
@@ -752,7 +752,7 @@ def _credentials_panel(service: DdnsService, created_account: dict[str, str] | N
           {_copy_row("Domainnamen:", hostname)}
           {_copy_row("Benutzername:", username)}
           {_copy_row("Kennwort:", password)}
-          {_copy_row("Magic management link:", management_url)}
+          {_copy_row("Private status page:", management_url)}
         </div>
       </div>
     </section>
@@ -814,6 +814,9 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
     ipv4 = html.escape(str(account.get("ipv4") or "-"))
     ipv6 = html.escape(str(account.get("ipv6") or "-"))
     updated = html.escape(str(account.get("updated_at") or "Never"))
+    history_rows = "\n".join(_user_event_row(event) for event in service.store.list_update_events_for_hostname(str(account["hostname"]), 20)) or """
+      <tr><td colspan="5" class="empty">No router updates yet.</td></tr>
+    """
     return _page(
         "DynDNS management",
         f"""
@@ -855,6 +858,23 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
                   <tr><th>Updated</th><td>{updated}</td></tr>
                 </tbody>
               </table>
+            </div>
+          </section>
+          <section class="section">
+            <div class="container">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">History</p>
+                  <h2>Router updates</h2>
+                  <p class="section-copy">Recent IP changes and failed DNS publishes for this hostname.</p>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="table">
+                  <thead><tr><th>Time</th><th>Status</th><th>IPv4</th><th>IPv6</th><th>Detail</th></tr></thead>
+                  <tbody>{history_rows}</tbody>
+                </table>
+              </div>
             </div>
           </section>
           <section class="section danger-section">
@@ -1080,6 +1100,15 @@ def _event_row(event: dict[str, str | None]) -> str:
     ipv6 = html.escape(str(event.get("ipv6") or "-"))
     detail = html.escape(str(event.get("detail") or "-"))
     return f"<tr><td>{created}</td><td>{hostname}</td><td>{status}</td><td>{ipv4}</td><td>{ipv6}</td><td>{detail}</td></tr>"
+
+
+def _user_event_row(event: dict[str, str | None]) -> str:
+    created = html.escape(str(event.get("created_at") or "-"))
+    status = html.escape(str(event.get("status") or "-"))
+    ipv4 = html.escape(str(event.get("ipv4") or "-"))
+    ipv6 = html.escape(str(event.get("ipv6") or "-"))
+    detail = html.escape(str(event.get("detail") or "-"))
+    return f"<tr><td>{created}</td><td>{status}</td><td>{ipv4}</td><td>{ipv6}</td><td>{detail}</td></tr>"
 
 
 def _page(title: str, body: str) -> str:

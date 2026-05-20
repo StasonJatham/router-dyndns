@@ -256,7 +256,7 @@ def test_admin_can_rotate_links_and_password(tmp_path: Path) -> None:
         data={"csrf": csrf, "hostname": "home.example.net", "action": "management"},
     )
     assert management.status_code == 200
-    assert "Management link rotated" in management.text
+    assert "Private status page rotated" in management.text
     assert "/m/" in management.text
 
     password = client.post(
@@ -304,7 +304,7 @@ def test_magic_hostname_without_login_generates_update_and_management_links(tmp_
 
     assert response.status_code == 200
     assert "Update-URL:" in response.text
-    assert "Magic management link:" in response.text
+    assert "Private status page:" in response.text
     assert ".ddns.example.net" in response.text
 
 
@@ -318,12 +318,30 @@ def test_magic_management_link_can_delete_hostname(tmp_path: Path) -> None:
     management = client.get(f"/m/{account['management_slug']}")
     assert management.status_code == 200
     assert "home.ddns.example.net" in management.text
+    assert "Router updates" in management.text
 
     deleted = client.post(f"/m/{account['management_slug']}/delete")
     assert deleted.status_code == 200
 
     update = client.get(f"/u/{account['update_slug']}", params={"myip": "203.0.113.9"})
     assert update.status_code == 404
+
+
+def test_management_page_shows_ip_history(tmp_path: Path) -> None:
+    database_path = tmp_path / "ddns.sqlite3"
+    store = DdnsStore(database_path)
+    account = store.create_account("home.ddns.example.net", "router")
+    store.log_update_event("home.ddns.example.net", "203.0.113.9", None, "updated", "ok", "198.51.100.1")
+    store.log_update_event("home.ddns.example.net", "203.0.113.10", None, "updated", "ok", "198.51.100.1")
+    app = make_app(DdnsSettings(database_path=database_path, admin_password="admin"))
+    client = TestClient(app)
+
+    response = client.get(f"/m/{account['management_slug']}")
+
+    assert response.status_code == 200
+    assert "Router updates" in response.text
+    assert "203.0.113.9" in response.text
+    assert "203.0.113.10" in response.text
 
 
 def test_custom_hostname_requires_verified_parent_domain(tmp_path: Path) -> None:
