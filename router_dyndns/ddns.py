@@ -649,10 +649,10 @@ def _render_public_home(
             <div class="container text-center d-grid justify-items-center gap-3">
               <p class="eyebrow">FRITZ!Box compatible</p>
               <h1>DynDNS without signups.</h1>
-              <p class="lead">Create a secure update endpoint under {suffix}. Provider hostnames are anonymous; custom domains require DNS proof.</p>
+              <p class="lead">Create a secure hostname under {suffix}. Use it directly, or point your own subdomain at it with a CNAME.</p>
               <div class="d-flex gap-2 flex-wrap justify-content-center mt-2">
                 <a class="btn btn-primary rounded-pill" href="#create">Get a hostname</a>
-                <a class="btn btn-outline-primary rounded-pill" href="#custom-domain">Verify a domain</a>
+                <a class="btn btn-outline-primary rounded-pill" href="#custom-domain">Publish inside my domain</a>
               </div>
             </div>
           </section>
@@ -663,8 +663,8 @@ def _render_public_home(
               <div class="row g-4 align-items-start">
               <div class="col-lg-7">
                 <p class="eyebrow">Free DynDNS hostname</p>
-                <h2>Create a router update URL</h2>
-                <p class="section-copy">Generate a random hostname, paste the update URL into your router, and keep the management link private.</p>
+                <h2>Create your DynDNS target</h2>
+                <p class="section-copy">Generate a random hostname, paste the update URL into your router, and keep the private status page. Your own DNS name can point to this hostname with a CNAME.</p>
               </div>
               <form method="post" action="/magic" class="col-lg-5 card card-body gap-3" aria-label="Create a generated DynDNS hostname">
                 <label>Router username
@@ -773,9 +773,9 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
       <div class="container">
         <div class="d-flex align-items-md-center justify-content-between gap-4 flex-column flex-md-row">
           <div>
-            <p class="eyebrow">Custom domain</p>
+            <p class="eyebrow">Direct custom-domain publishing</p>
             <h2>Verify DNS ownership</h2>
-            <p class="section-copy">We only issue router credentials after the DNS record proves you control the domain.</p>
+            <p class="section-copy">Use this only when RouterPulse should publish A/AAAA records directly inside your domain. If you just want your own subdomain, generate a hostname above and create a CNAME to it.</p>
           </div>
         </div>
         <div class="row g-3 mt-4">
@@ -812,10 +812,11 @@ def _credentials_panel(service: DdnsService, created_account: dict[str, str] | N
       <div class="container">
         <p class="eyebrow">Credentials generated</p>
         <h2>{html.escape(hostname)}</h2>
-        <p class="section-copy">Save this now. The password and management link are only shown on this screen.</p>
+        <p class="section-copy">Save this now. The password and private status page are only shown on this screen. To use your own DNS name, create a CNAME from that name to this hostname.</p>
         <div class="d-grid gap-2">
           {_copy_row("Update-URL:", update_url)}
           {_copy_row("Domainnamen:", hostname)}
+          {_copy_row("CNAME target:", hostname)}
           {_copy_row("Benutzername:", username)}
           {_copy_row("Kennwort:", password)}
           {_copy_row("Private status page:", management_url)}
@@ -898,11 +899,12 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
               <div class="col-lg-6">
                 <p class="eyebrow">Router settings</p>
                 <h2>FRITZ!Box fields</h2>
-                <p class="section-copy">Use these values in the FRITZ!Box custom DynDNS provider fields.</p>
+                <p class="section-copy">Use these values in the FRITZ!Box custom DynDNS provider fields. If you use your own DNS name, point it at this hostname with a CNAME.</p>
               </div>
               <div class="col-lg-6 d-grid gap-2">
                 {_copy_row("Update-URL:", update_url)}
                 {_copy_row("Domainnamen:", hostname)}
+                {_copy_row("CNAME target:", hostname)}
                 {_copy_row("Benutzername:", username)}
                 {_copy_row("Kennwort:", "unchanged; only shown when generated")}
               </div>

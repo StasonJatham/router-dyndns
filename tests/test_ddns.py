@@ -289,6 +289,7 @@ def test_self_service_managed_hostname_generates_random_account(tmp_path: Path) 
 
     assert response.status_code == 200
     assert "Update-URL:" in response.text
+    assert "CNAME target:" in response.text
     assert ".ddns.example.net" in response.text
     assert "/u/" in response.text
     assert "/m/" in response.text
@@ -309,6 +310,7 @@ def test_magic_hostname_without_login_generates_update_and_management_links(tmp_
 
     assert response.status_code == 200
     assert "Update-URL:" in response.text
+    assert "CNAME target:" in response.text
     assert "Private status page:" in response.text
     assert ".ddns.example.net" in response.text
 
@@ -323,6 +325,7 @@ def test_magic_management_link_can_delete_hostname(tmp_path: Path) -> None:
     management = client.get(f"/m/{account['management_slug']}")
     assert management.status_code == 200
     assert "home.ddns.example.net" in management.text
+    assert "CNAME target:" in management.text
     assert "Router updates" in management.text
 
     deleted = client.post(f"/m/{account['management_slug']}/delete")

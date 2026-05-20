@@ -2,7 +2,7 @@
 
 **Self-hosted DynDNS for FRITZ!Box, OpenWrt, pfSense, OPNsense, UniFi, MikroTik, and any router that can call a custom DDNS update URL.**
 
-RouterPulse is the friendly name for `router-dyndns`: a small FastAPI Dynamic DNS provider you can run on your own VPS. It gives users FRITZ!Box-ready DynDNS credentials, keeps public A/AAAA records updated through Cloudflare or RFC 2136, and supports verified custom domains with DNS TXT ownership checks.
+RouterPulse is the friendly name for `router-dyndns`: a small FastAPI Dynamic DNS provider you can run on your own VPS. It gives users FRITZ!Box-ready DynDNS credentials, keeps public A/AAAA records updated through Cloudflare or RFC 2136, provides generated hostnames that work as CNAME targets, and supports verified custom domains with DNS TXT ownership checks.
 
 If you want a lightweight DuckDNS / Dynu / No-IP style service that you control yourself, RouterPulse is built for that use case.
 
@@ -12,6 +12,7 @@ If you want a lightweight DuckDNS / Dynu / No-IP style service that you control 
 
 - **Self-hosted Dynamic DNS provider** for home labs, small ISPs, communities, and private infrastructure.
 - **FRITZ!Box compatible**: copy the generated `Update-URL`, `Domainnamen`, `Benutzername`, and `Kennwort` straight into the German FRITZ!Box DynDNS form.
+- **CNAME-friendly hostnames**: users can use the generated hostname directly, or point `home.example.com` to it with a CNAME.
 - **No registration required**: provider hostnames and custom-domain setup both use private magic links.
 - **Custom domain support**: users enter a domain, save the private claim link, add a DNS TXT record, then press a button to verify ownership before credentials are issued.
 - **Real DNS publishing** through **Cloudflare** or **RFC 2136** with A and AAAA support.
@@ -37,6 +38,7 @@ RouterPulse lets you host your own managed DynDNS service:
 3. RouterPulse shows the exact router settings for the DynDNS form.
 4. The router periodically calls the update URL with its current public IPv4/IPv6 address.
 5. RouterPulse publishes the matching DNS records through your configured DNS backend.
+6. If the user wants their own DNS name, they can create a CNAME to the generated hostname.
 
 That means users always have a current hostname for VPN, remote access, self-hosted apps, home servers, NAS devices, and lab networks.
 
@@ -46,6 +48,7 @@ That means users always have a current hostname for VPN, remote access, self-hos
 - Free DDNS service for friends, customers, a community, or a home lab.
 - Dynamic DNS for IPv4 and IPv6 home internet connections.
 - Custom domain DDNS with DNS TXT verification.
+- CNAME target hostnames for users who want `home.example.com` without sharing DNS API access.
 - Lightweight Cloudflare DDNS provider with a web UI.
 - RFC 2136 / TSIG DynDNS frontend for BIND, Knot, PowerDNS, or compatible DNS servers.
 
@@ -56,6 +59,7 @@ That means users always have a current hostname for VPN, remote access, self-hos
 | Router update URLs | FRITZ!Box custom provider URL, `/u/<slug>`, and `/nic/update` compatibility |
 | DNS records | A and AAAA |
 | DNS providers | Cloudflare API and RFC 2136 dynamic DNS |
+| Generated hostnames | Random provider-owned names that can be used directly or as CNAME targets |
 | Custom domains | TXT challenge verification before hostname creation |
 | Persistence | SQLite with WAL mode |
 | API | FastAPI, OpenAPI, Swagger UI, ReDoc |
@@ -144,6 +148,7 @@ Create a hostname in the web UI. RouterPulse shows the exact values for:
 
 - `Update-URL`
 - `Domainnamen`
+- `CNAME target`
 - `Benutzername`
 - `Kennwort`
 
@@ -161,9 +166,23 @@ https://ddns.example.net/nic/update?hostname=<domain>&myip=<ipaddr>&myipv6=<ip6a
 
 Prefer `/u/<slug>` for managed service use because the router request cannot change the hostname.
 
+## Use Your Own Subdomain With CNAME
+
+Most users do not need domain verification. Generate a RouterPulse hostname first, then create a CNAME at your DNS provider:
+
+```dns
+home.example.com.  CNAME  a1b2c3d4.ddns.example.net.
+```
+
+Put the RouterPulse `Update-URL`, `Domainnamen`, `Benutzername`, and `Kennwort` into the router. The router updates `a1b2c3d4.ddns.example.net`; `home.example.com` follows through the CNAME.
+
+Use a subdomain such as `home.example.com`. Root/apex domains like `example.com` usually cannot be plain CNAME records unless your DNS provider supports CNAME flattening or ALIAS/ANAME records.
+
 ## Custom Domain Flow
 
-Custom domains are intentionally simple:
+This flow is only needed when RouterPulse should publish A/AAAA records directly inside a user-owned domain instead of using a CNAME target.
+
+Custom-domain publishing is intentionally simple:
 
 1. Enter the domain.
 2. Save the private claim link.
