@@ -515,6 +515,10 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
     def healthz() -> str:
         return "ok"
 
+    @app.get("/privacy", response_class=HTMLResponse, include_in_schema=False)
+    def privacy() -> str:
+        return _render_privacy_page()
+
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon() -> FileResponse:
         return FileResponse(ASSET_DIR / "favicon.ico", media_type="image/x-icon")
@@ -757,12 +761,6 @@ def _render_public_home(
             </div>
           </section>
           {challenge_html}
-          <footer class="py-4 bg-body border-top">
-            <div class="container nav justify-content-center gap-3">
-              <a class="nav-link p-0 small text-secondary" href="/docs">API docs</a>
-              <a class="nav-link p-0 small text-secondary" href="/redoc">ReDoc</a>
-            </div>
-          </footer>
         </main>
         """,
     )
@@ -1353,6 +1351,62 @@ def _user_event_row(event: dict[str, str | None]) -> str:
     return f"<tr><td>{created}</td><td>{status}</td><td>{ipv4}</td><td>{ipv6}</td><td>{detail}</td></tr>"
 
 
+def _render_privacy_page() -> str:
+    return _page(
+        "Legal and Privacy",
+        f"""
+        <main id="main">
+          {_top_nav()}
+          <section class="hero-band compact">
+            <div class="container text-center d-grid justify-items-center gap-3">
+              <p class="eyebrow">Legal and privacy</p>
+              <h1>KarlDNS keeps accountless DynDNS simple.</h1>
+              <p class="lead">This page explains the basic data handled by this self-hosted service. Configure your own imprint, controller details, and jurisdiction-specific terms before offering it publicly.</p>
+            </div>
+          </section>
+          <section class="section">
+            <div class="container narrow d-grid gap-4">
+              <div>
+                <h2>Data processed</h2>
+                <p class="section-copy">KarlDNS stores generated hostnames, public DNS target names, update slugs, hashed management tokens, hashed router passwords, DNS TXT verification challenges, IP update history, timestamps, and operational events needed to run Dynamic DNS.</p>
+              </div>
+              <div>
+                <h2>Secrets</h2>
+                <p class="section-copy">Private management links, update URLs, router passwords, and one-box update URLs are bearer secrets. Anyone with them can update or manage the related hostname. Passwords and management lookup values are not stored in recoverable plaintext.</p>
+              </div>
+              <div>
+                <h2>Logs and retention</h2>
+                <p class="section-copy">The service keeps recent update events for troubleshooting and runs cleanup jobs for abandoned setup flows and unused hostnames. Server and reverse-proxy logs may also contain IP addresses and request metadata depending on your deployment.</p>
+              </div>
+              <div>
+                <h2>Contact</h2>
+                <p class="section-copy">For the public KarlDNS instance, contact Karl through <a href="https://karl.fail" rel="noopener">karl.fail</a> or <a href="https://karlcom.de" rel="noopener">karlcom.de</a>.</p>
+              </div>
+            </div>
+          </section>
+        </main>
+        """,
+    )
+
+
+def _site_footer() -> str:
+    return """
+    <footer class="site-footer border-top">
+      <div class="container d-flex align-items-center justify-content-between gap-3 flex-column flex-md-row">
+        <div class="small text-secondary">Made with ❤️ by Karl</div>
+        <nav class="nav justify-content-center gap-3" aria-label="Footer links">
+          <a class="nav-link p-0 small text-secondary" href="https://github.com/StasonJatham/router-dyndns" rel="noopener">GitHub</a>
+          <a class="nav-link p-0 small text-secondary" href="https://karl.fail" rel="noopener">karl.fail</a>
+          <a class="nav-link p-0 small text-secondary" href="https://karlcom.de" rel="noopener">karlcom.de</a>
+          <a class="nav-link p-0 small text-secondary" href="/docs">API docs</a>
+          <a class="nav-link p-0 small text-secondary" href="/redoc">ReDoc</a>
+          <a class="nav-link p-0 small text-secondary" href="/privacy">Legal & privacy</a>
+        </nav>
+      </div>
+    </footer>
+    """
+
+
 def _page(title: str, body: str) -> str:
     return f"""
     <!doctype html>
@@ -1480,6 +1534,8 @@ def _page(title: str, body: str) -> str:
           .admin-table-scroll {{ max-height: 560px; overflow: auto; }}
           .admin-table-scroll thead th {{ position: sticky; top: 0; z-index: 1; background: var(--rp-surface); }}
           .table-page-size {{ width: auto; min-width: 76px; }}
+          .site-footer {{ padding: 24px 0; background: var(--rp-bg); }}
+          .site-footer .nav-link:hover {{ color: var(--rp-ink) !important; }}
           table {{ width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--rp-ink); }}
           th, td {{ border-bottom: 1px solid var(--rp-soft-line); padding: 14px 10px; text-align: left; white-space: nowrap; }}
           tr:last-child th, tr:last-child td {{ border-bottom: 0; }}
@@ -1507,6 +1563,6 @@ def _page(title: str, body: str) -> str:
           }}
         </style>
       </head>
-      <body>{body}</body>
+      <body>{body}{_site_footer()}</body>
     </html>
     """

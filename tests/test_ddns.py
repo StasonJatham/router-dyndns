@@ -609,6 +609,27 @@ def test_application_pages_use_stricter_script_csp(tmp_path: Path) -> None:
     assert client.get("/app.js").status_code == 200
 
 
+def test_footer_links_and_privacy_page_are_available(tmp_path: Path) -> None:
+    app = make_app(DdnsSettings(database_path=tmp_path / "ddns.sqlite3", admin_password="admin"))
+    client = TestClient(app)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "Made with ❤️ by Karl" in response.text
+    assert 'href="https://github.com/StasonJatham/router-dyndns"' in response.text
+    assert 'href="https://karl.fail"' in response.text
+    assert 'href="https://karlcom.de"' in response.text
+    assert 'href="/privacy"' in response.text
+
+    privacy = client.get("/privacy")
+    assert privacy.status_code == 200
+    assert "Legal and privacy" in privacy.text
+    assert "Data processed" in privacy.text
+    assert "hashed router passwords" in privacy.text
+    assert "Made with ❤️ by Karl" in privacy.text
+
+
 def test_web_icon_assets_and_manifest_are_exposed(tmp_path: Path) -> None:
     app = make_app(DdnsSettings(database_path=tmp_path / "ddns.sqlite3", admin_password="admin"))
     client = TestClient(app)
