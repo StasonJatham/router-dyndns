@@ -642,6 +642,7 @@ def _render_public_home(
     challenge: dict[str, str | None] | None = None,
 ) -> str:
     suffix = html.escape(settings.hostname_suffix or "your DynDNS domain")
+    demo_update_url = html.escape(f"{settings.public_base_url.rstrip('/')}/u/<secret>?myip=<ipaddr>")
     created_html = _credentials_panel(service, created_account)
     message_html = _message_band(message) if message and not challenge else ""
     challenge_html = _custom_domain_flow(service, challenge, message)
@@ -652,24 +653,33 @@ def _render_public_home(
           {_top_nav()}
           <section class="hero-band">
             <div class="container text-center d-grid justify-items-center gap-3">
-              <p class="eyebrow">FRITZ!Box compatible</p>
-              <h1>DynDNS without signups.</h1>
-              <p class="lead">Create a secure hostname under {suffix}. Use it directly, or point your own subdomain at it with a CNAME.</p>
+              <img class="hero-logo" src="/logo.svg" alt="" width="92" height="92">
+              <p class="eyebrow">Dynamic DNS for FRITZ!Box and any router</p>
+              <h1>The simplest way to keep a home IP updated.</h1>
+              <div class="install-pill mx-auto">
+                <code>{demo_update_url}</code>
+              </div>
+              <p class="lead">Generate one secret update URL under {suffix}. Paste it into your router, script it with curl, or point your own subdomain at it with a CNAME.</p>
               <div class="d-flex gap-2 flex-wrap justify-content-center mt-2">
-                <a class="btn btn-primary rounded-pill" href="#create">Get a hostname</a>
-                <a class="btn btn-outline-primary rounded-pill" href="#custom-domain">Publish inside my domain</a>
+                <a class="btn btn-primary rounded-pill" href="#create">Generate hostname</a>
+                <a class="btn btn-outline-primary rounded-pill" href="#manual-updates">See curl flow</a>
               </div>
             </div>
           </section>
           {message_html}
           {created_html}
           <section class="section" id="create">
-            <div class="container">
-              <div class="row g-4 align-items-start">
-              <div class="col-lg-7">
-                <p class="eyebrow">Free DynDNS hostname</p>
-                <h2>Create your DynDNS target</h2>
-                <p class="section-copy">Generate a random hostname, paste the update URL into your router, and keep the private status page. Your own DNS name can point to this hostname with a CNAME.</p>
+            <div class="container narrow">
+              <div class="row g-4 align-items-center">
+              <div class="col-lg-6">
+                <p class="eyebrow">Create in one step</p>
+                <h2>No account. No login.</h2>
+                <p class="section-copy">The generated URL is the secret. FRITZ!Box replaces <code>&lt;ipaddr&gt;</code> and calls it when your public IP changes.</p>
+                <div class="terminal-card mt-4" aria-hidden="true">
+                  <div class="terminal-dots"><span></span><span></span><span></span></div>
+                  <code>$ curl -sS 'https://ddns.example.net/u/&lt;secret&gt;?myip=203.0.113.10'</code>
+                  <code>good 203.0.113.10</code>
+                </div>
               </div>
               <form method="post" action="/magic" class="col-lg-5 card card-body gap-3" aria-label="Create a generated DynDNS hostname">
                 <label>Router login name <span class="text-secondary fw-normal">(optional)</span>
@@ -678,6 +688,19 @@ def _render_public_home(
                 </label>
                 <button type="submit" class="btn btn-primary rounded-pill">Generate hostname</button>
               </form>
+              </div>
+            </div>
+          </section>
+          <section class="section" id="manual-updates">
+            <div class="container narrow text-center">
+              <h2>Update from anything that can send GET.</h2>
+              <p class="lead mx-auto mt-3">Use FRITZ!Box placeholders, curl, cron, Home Assistant, OpenWrt, pfSense, OPNsense, UniFi, MikroTik, or your own automation.</p>
+              <div class="terminal-card text-start mt-4">
+                <div class="terminal-dots"><span></span><span></span><span></span></div>
+                <code># explicit IPv4</code>
+                <code>curl -sS 'https://ddns.example.net/u/&lt;secret&gt;?myip=203.0.113.10'</code>
+                <code># source IP fallback</code>
+                <code>curl -sS 'https://ddns.example.net/u/&lt;secret&gt;'</code>
               </div>
             </div>
           </section>
@@ -698,7 +721,8 @@ def _top_nav(label: str | None = None, links: str = "") -> str:
     if label:
         account_html = f'<span class="navbar-text text-truncate d-none d-sm-inline-block" style="max-width: 38vw;">{html.escape(label)}</span>'
     if not links:
-        account_html += '<a class="btn btn-sm btn-outline-secondary rounded-pill" href="/#custom-domain">Domain setup</a>'
+        links = '<a class="nav-link px-0" href="/docs">Docs</a><a class="nav-link px-0" href="/redoc">API</a>'
+        account_html += '<a class="btn btn-sm btn-primary rounded-pill" href="/#create">Generate</a>'
     return f"""
     <a class="skip-link" href="#main">Skip to content</a>
     <nav class="navbar navbar-expand-sm sticky-top navbar-blur border-bottom" aria-label="Main navigation">
@@ -1346,31 +1370,36 @@ def _page(title: str, body: str) -> str:
             font: 400 16px/1.5 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           }}
           .container {{ max-width: 1040px; }}
+          .container.narrow {{ max-width: 760px; }}
           .skip-link {{ position: fixed; left: 16px; top: 10px; z-index: 40; transform: translateY(-140%); padding: 8px 20px; border-radius: 999px; background: var(--rp-ink); color: var(--rp-bg); text-decoration: none; font-size: 14px; transition: transform .16s ease; }}
           .skip-link:focus {{ transform: translateY(0); }}
           .navbar-blur {{ min-height: 56px; background: var(--rp-nav-bg); backdrop-filter: saturate(180%) blur(20px); }}
           .brand {{ display: inline-flex; align-items: center; gap: 9px; color: var(--rp-ink); font-size: 15px; font-weight: 600; letter-spacing: 0; white-space: nowrap; }}
           .brand:hover {{ color: var(--rp-ink); }}
-          .brand img {{ width: 28px; height: 28px; display: block; }}
+          .brand img {{ width: 24px; height: 24px; display: block; }}
           .navbar .nav-link, .navbar-text {{ color: var(--rp-muted); font-size: 14px; font-weight: 500; }}
           .navbar .nav-link:hover {{ color: var(--rp-ink); }}
-          .hero-band {{ min-height: auto; display: grid; align-items: center; background: var(--rp-bg); text-align: center; padding: 88px 0; }}
-          .hero-band .container {{ max-width: 720px; }}
+          .hero-band {{ min-height: auto; display: grid; align-items: center; background: var(--rp-bg); text-align: center; padding: 104px 0 88px; }}
+          .hero-band .container {{ max-width: 720px; min-width: 0; }}
+          .hero-logo {{ width: 92px; height: 92px; margin-inline: auto; }}
           .hero-band.compact {{ min-height: 320px; }}
-          .section {{ padding: 88px 0; background: var(--rp-surface); }}
+          .section {{ padding: 92px 0; background: var(--rp-surface); }}
           .section + .section {{ border-top: 0; }}
           .success-section {{ background: var(--rp-surface); }}
           .danger-section {{ background: var(--rp-surface); border-top: 1px solid var(--rp-soft-line); }}
           .page-heading, .admin-heading .container {{ max-width: 760px; }}
           h1, h2, h3, p {{ margin: 0; }}
           h1, h2 {{ font-family: "SF Pro Rounded", ui-rounded, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
-          h1 {{ max-width: 720px; font-size: 36px; line-height: 1.11; font-weight: 500; letter-spacing: 0; }}
+          h1 {{ max-width: 720px; font-size: 38px; line-height: 1.1; font-weight: 500; letter-spacing: 0; }}
           h2 {{ font-size: 30px; line-height: 1.2; font-weight: 500; letter-spacing: 0; }}
           h3 {{ font-size: 20px; line-height: 1.4; font-weight: 500; }}
           .eyebrow {{ color: var(--rp-charcoal); font-size: 14px; font-weight: 500; letter-spacing: 0; text-transform: none; }}
           .lead {{ max-width: 660px; color: var(--rp-muted); font-size: 16px; line-height: 1.5; letter-spacing: 0; }}
           .section-copy, .intro {{ margin-top: 12px; max-width: 560px; color: var(--rp-muted); font-size: 15px; line-height: 1.5; }}
+          .install-pill {{ display: inline-flex; align-items: center; max-width: 100%; min-width: 0; min-height: 48px; padding: 12px 20px; border-radius: 9999px; background: var(--rp-surface-alt); color: var(--rp-ink); }}
+          .install-pill code {{ min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 15px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }}
           .card {{ background: var(--rp-surface); border: 1px solid var(--rp-line); border-radius: 12px; box-shadow: none; }}
+          .card-body {{ padding: 24px; }}
           label {{ display: grid; gap: 8px; color: var(--rp-charcoal); font-size: 14px; font-weight: 500; }}
           .form-control, input {{ width: 100%; min-height: 40px; border: 1px solid var(--bs-border-color); border-radius: 9999px; padding: 8px 16px; color: var(--bs-body-color); font: inherit; background: var(--bs-body-bg); outline: none; }}
           .form-select {{ border-radius: 9999px; }}
@@ -1393,6 +1422,12 @@ def _page(title: str, body: str) -> str:
           .copy-field code.form-control {{ width: 1%; flex: 1 1 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }}
           .copy-field code {{ min-height: 40px; margin: 0; color: var(--rp-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; line-height: 1.6; background: var(--rp-surface-alt); }}
           .manual-code {{ overflow-x: auto; padding: 16px; border: 1px solid var(--rp-line); border-radius: 12px; color: var(--rp-ink); background: var(--rp-surface-alt); font: 400 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }}
+          .terminal-card {{ display: grid; gap: 10px; padding: 16px; border: 1px solid var(--rp-line); border-radius: 12px; color: var(--rp-ink); background: var(--rp-surface); font: 400 14px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }}
+          .terminal-card code {{ display: block; overflow-wrap: anywhere; color: inherit; font: inherit; }}
+          .terminal-dots {{ display: flex; gap: 6px; margin-bottom: 6px; }}
+          .terminal-dots span {{ width: 12px; height: 12px; border-radius: 999px; background: #ff5f56; }}
+          .terminal-dots span:nth-child(2) {{ background: #ffbd2e; }}
+          .terminal-dots span:nth-child(3) {{ background: #27c93f; }}
           .admin-table-scroll {{ max-height: 560px; overflow: auto; }}
           .admin-table-scroll thead th {{ position: sticky; top: 0; z-index: 1; background: var(--rp-surface); }}
           .table-page-size {{ width: auto; min-width: 76px; }}
@@ -1407,9 +1442,13 @@ def _page(title: str, body: str) -> str:
             h1 {{ font-size: 32px; }}
           }}
           @media (max-width: 560px) {{
+            .container, .container.narrow, .hero-band .container {{ width: 100%; max-width: 100%; }}
             .brand {{ font-size: 14px; }}
             .brand img {{ width: 24px; height: 24px; }}
+            .navbar .nav-link {{ display: none; }}
             .hero-band .btn, .card button {{ width: 100%; }}
+            .install-pill {{ width: 100%; }}
+            .hero-logo {{ width: 76px; height: 76px; }}
             .copy-field {{ display: grid; }}
             .copy-field .input-group-text {{ min-width: 0; border-radius: 12px 12px 0 0; }}
             .copy-field code {{ white-space: normal; overflow-wrap: anywhere; border-radius: 0; }}
