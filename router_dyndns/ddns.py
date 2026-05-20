@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import html
 import secrets
 import sqlite3
 import urllib.parse
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 
@@ -68,8 +72,19 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
         raise RuntimeError("DDNS_REQUIRE_DNS_PROVIDER is set but no DNS backend is configured")
 
     store = DdnsStore(settings.database_path)
-    store.cleanup(settings.cleanup_challenge_hours)
+    store.cleanup(settings.cleanup_challenge_hours, settings.cleanup_unused_account_hours)
     service = DdnsService(settings, store)
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        cleanup_task = asyncio.create_task(_cleanup_loop(store, settings))
+        try:
+            yield
+        finally:
+            cleanup_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await cleanup_task
+
     app = FastAPI(
         title="router_dyndns DDNS",
         summary="A small self-hosted DynDNS provider for FRITZ!Box routers.",
@@ -81,6 +96,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_tags=OPENAPI_TAGS,
+        lifespan=lifespan,
     )
     app.include_router(create_api_router(settings, store, service))
 
@@ -333,6 +349,16 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
         return apply_update(request, host, myip, ipaddr, myipv6, ip6addr)
 
     return app
+
+
+async def _cleanup_loop(store: DdnsStore, settings: DdnsSettings) -> None:
+    while True:
+        await asyncio.sleep(settings.cleanup_interval_seconds)
+        await run_in_threadpool(
+            store.cleanup,
+            settings.cleanup_challenge_hours,
+            settings.cleanup_unused_account_hours,
+        )
 
 
 def _parse_form(body: bytes) -> dict[str, list[str]]:

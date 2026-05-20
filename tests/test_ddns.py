@@ -1,4 +1,5 @@
 import re
+import time
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -532,3 +533,41 @@ def test_require_dns_provider_fails_startup_without_backend(tmp_path: Path) -> N
         assert "no DNS backend" in str(exc)
     else:
         raise AssertionError("expected startup failure")
+
+
+def test_background_cleanup_removes_abandoned_setup_flows(tmp_path: Path) -> None:
+    database_path = tmp_path / "ddns.sqlite3"
+    app = make_app(
+        DdnsSettings(
+            database_path=database_path,
+            admin_password="admin",
+            cleanup_challenge_hours=1,
+            cleanup_unused_account_hours=1,
+            cleanup_interval_seconds=1,
+        )
+    )
+    store = DdnsStore(database_path)
+
+    with TestClient(app):
+        abandoned_claim = store.create_domain_challenge("abandoned.example.net")
+        verified_claim = store.create_domain_challenge("verified.example.net")
+        abandoned_account = store.create_account("abandoned.ddns.example.net", "router")
+        active_account = store.create_account("active.ddns.example.net", "router")
+        store.upsert("active.ddns.example.net", "203.0.113.10", None)
+
+        old = "2000-01-01T00:00:00+00:00"
+        with store.connect() as conn:
+            conn.execute("UPDATE domain_challenges SET created_at = ? WHERE domain = ?", (old, abandoned_claim["domain"]))
+            conn.execute(
+                "UPDATE domain_challenges SET created_at = ?, verified_at = ? WHERE domain = ?",
+                (old, old, verified_claim["domain"]),
+            )
+            conn.execute("UPDATE accounts SET created_at = ? WHERE hostname = ?", (old, abandoned_account["hostname"]))
+            conn.execute("UPDATE accounts SET created_at = ? WHERE hostname = ?", (old, active_account["hostname"]))
+
+        time.sleep(1.3)
+
+    assert store.get_domain_challenge("abandoned.example.net") is None
+    assert store.get_domain_challenge("verified.example.net") is not None
+    assert store.get_account_by_slug(abandoned_account["update_slug"]) is None
+    assert store.get_account_by_slug(active_account["update_slug"]) is not None

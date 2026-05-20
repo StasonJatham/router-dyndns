@@ -76,7 +76,6 @@ Run locally:
 
 ```bash
 export DDNS_ADMIN_PASSWORD='replace-with-a-long-random-value'
-export DDNS_SESSION_SECRET='replace-with-a-second-long-random-value'
 export DDNS_PUBLIC_BASE_URL='http://localhost:8080'
 export DDNS_HOSTNAME_SUFFIX='ddns.example.net'
 export DDNS_DATABASE='./ddns.sqlite3'
@@ -104,6 +103,9 @@ export DDNS_DATABASE='/data/ddns.sqlite3'
 export DDNS_REQUIRE_DNS_PROVIDER=1
 export DDNS_DNS_ZONES='ddns.example.net'
 export DDNS_TRUSTED_PROXY_IPS='127.0.0.1,::1'
+export DDNS_CLEANUP_CHALLENGE_HOURS=72
+export DDNS_CLEANUP_UNUSED_ACCOUNT_HOURS=168
+export DDNS_CLEANUP_INTERVAL_SECONDS=3600
 ```
 
 ### Cloudflare DNS Backend
@@ -202,11 +204,20 @@ docker compose up -d --build
 
 - Run behind HTTPS.
 - Keep `.env` out of git.
-- Use long random values for `DDNS_ADMIN_PASSWORD` and `DDNS_SESSION_SECRET`.
+- Use a long random value for `DDNS_ADMIN_PASSWORD`.
 - Use a least-privilege DNS API token or TSIG key.
 - Configure `DDNS_TRUSTED_PROXY_IPS` only for reverse proxies that strip user-supplied forwarding headers.
+- Leave cleanup enabled. The app periodically removes abandoned TXT challenges and generated hostnames that were never updated by a router.
 - Back up `/data/ddns.sqlite3`.
 - Run one Uvicorn worker with SQLite. The per-host update lock is process-local.
+
+Cleanup defaults:
+
+| Variable | Default | Purpose |
+| --- | ---: | --- |
+| `DDNS_CLEANUP_CHALLENGE_HOURS` | `72` | Delete unverified DNS TXT claims after this many hours. |
+| `DDNS_CLEANUP_UNUSED_ACCOUNT_HOURS` | `168` | Delete generated hostnames that never received a router update after this many hours. |
+| `DDNS_CLEANUP_INTERVAL_SECONDS` | `3600` | Run the in-app cleanup scheduler at this interval. |
 
 SQLite backup example:
 

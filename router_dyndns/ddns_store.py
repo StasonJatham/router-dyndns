@@ -299,13 +299,29 @@ class DdnsStore:
             )
         return True
 
-    def cleanup(self, challenge_hours: int) -> None:
-        cutoff = datetime.now(UTC) - timedelta(hours=challenge_hours)
+    def cleanup(self, challenge_hours: int, unused_account_hours: int) -> dict[str, int]:
+        challenge_cutoff = (datetime.now(UTC) - timedelta(hours=challenge_hours)).isoformat()
+        unused_account_cutoff = (datetime.now(UTC) - timedelta(hours=unused_account_hours)).isoformat()
         with self.connect() as conn:
-            conn.execute(
+            challenge_cursor = conn.execute(
                 "DELETE FROM domain_challenges WHERE verified_at IS NULL AND created_at < ?",
-                (cutoff.isoformat(),),
+                (challenge_cutoff,),
             )
+            account_cursor = conn.execute(
+                """
+                DELETE FROM accounts
+                WHERE created_at < ?
+                  AND NOT EXISTS (
+                    SELECT 1 FROM records WHERE records.hostname = accounts.hostname
+                  )
+                """,
+                (unused_account_cutoff,),
+            )
+            conn.execute("DELETE FROM rate_limits WHERE window < ?", (int(time.time()) - 3600,))
+        return {
+            "domain_challenges": challenge_cursor.rowcount,
+            "unused_accounts": account_cursor.rowcount,
+        }
 
     def _init_db(self) -> None:
         with self.connect() as conn:

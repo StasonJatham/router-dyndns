@@ -27,6 +27,8 @@ class DdnsSettings(BaseModel):
     cloudflare_api_token: str = Field(default="")
     cloudflare_zone_id: str = Field(default="")
     cleanup_challenge_hours: int = Field(default=72, ge=1, le=24 * 365)
+    cleanup_unused_account_hours: int = Field(default=168, ge=1, le=24 * 365)
+    cleanup_interval_seconds: int = Field(default=3600, ge=1, le=24 * 60 * 60)
     ttl: int = Field(default=60, ge=60, le=86400)
 
     @field_validator("public_base_url")
@@ -65,6 +67,8 @@ class DdnsSettings(BaseModel):
             cloudflare_api_token=os.getenv("DDNS_CLOUDFLARE_API_TOKEN", ""),
             cloudflare_zone_id=os.getenv("DDNS_CLOUDFLARE_ZONE_ID", ""),
             cleanup_challenge_hours=_env_int("DDNS_CLEANUP_CHALLENGE_HOURS", 72),
+            cleanup_unused_account_hours=_env_int("DDNS_CLEANUP_UNUSED_ACCOUNT_HOURS", 168),
+            cleanup_interval_seconds=_env_int("DDNS_CLEANUP_INTERVAL_SECONDS", 3600),
             ttl=_env_int("DDNS_TTL", 60),
         )
 
