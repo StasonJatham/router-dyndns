@@ -817,6 +817,7 @@ def _credentials_panel(service: DdnsService, created_account: dict[str, str] | N
     management_url = service.magic_management_url(created_account)
     cname_record = f"your-subdomain.example.com. CNAME {hostname}."
     fritzbox_fields = _fritzbox_fields(update_url, hostname, username, password, management_url)
+    manual_commands = _manual_update_commands(update_url)
     return f"""
     <section class="section success-section">
       <div class="container">
@@ -838,6 +839,7 @@ def _credentials_panel(service: DdnsService, created_account: dict[str, str] | N
           {_copy_row("Kennwort (optional):", password, "Secret")}
           {_copy_row("Private status page:", management_url, "Secret")}
         </div>
+        {_manual_update_panel(manual_commands)}
       </div>
     </section>
     """
@@ -879,6 +881,31 @@ def _copy_button(label: str, value: str) -> str:
     safe_label = html.escape(label)
     safe_value = html.escape(value)
     return f'<button type="button" class="btn btn-outline-primary rounded-pill" data-copy="{safe_value}">{safe_label}</button>'
+
+
+def _manual_update_commands(update_url: str) -> str:
+    update_base = update_url.split("?", 1)[0]
+    return "\n".join(
+        [
+            f"curl -sS '{update_base}?myip=203.0.113.10'",
+            f"curl -sS '{update_base}?myipv6=2001:db8::10'",
+            f"curl -sS '{update_base}'",
+        ]
+    )
+
+
+def _manual_update_panel(commands: str) -> str:
+    safe_commands = html.escape(commands)
+    return f"""
+        <div class="card card-body gap-3 mt-4">
+          <div>
+            <h3>Manual updates</h3>
+            <p class="section-copy">FRITZ!Box replaces <code>&lt;ipaddr&gt;</code> and <code>&lt;ip6addr&gt;</code>, then sends a GET request to the Update-URL. Scripts and other routers can do the same with curl. If no IP parameter is sent, RouterPulse uses the request source IP.</p>
+          </div>
+          <pre class="manual-code mb-0"><code>{safe_commands}</code></pre>
+          {_copy_button("Copy curl examples", commands)}
+        </div>
+    """
 
 
 def _fritzbox_fields(
@@ -935,6 +962,7 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
     updated = html.escape(str(account.get("updated_at") or "Never"))
     fritzbox_fields = _fritzbox_fields(update_url, hostname, username, "unchanged; only shown when generated")
     cname_record = f"your-subdomain.example.com. CNAME {hostname}."
+    manual_commands = _manual_update_commands(update_url)
     history_rows = "\n".join(_user_event_row(event) for event in service.store.list_update_events_for_hostname(str(account["hostname"]), 20)) or """
       <tr><td colspan="5" class="empty">No router updates yet.</td></tr>
     """
@@ -972,6 +1000,7 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
                 {_copy_row("Kennwort (optional):", "unchanged; only shown when generated", "Secret")}
               </div>
               </div>
+              {_manual_update_panel(manual_commands)}
             </div>
           </section>
           <section class="section">
@@ -1363,6 +1392,7 @@ def _page(title: str, body: str) -> str:
           .copy-field .form-control {{ min-width: 0; }}
           .copy-field code.form-control {{ width: 1%; flex: 1 1 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }}
           .copy-field code {{ min-height: 40px; margin: 0; color: var(--rp-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; line-height: 1.6; background: var(--rp-surface-alt); }}
+          .manual-code {{ overflow-x: auto; padding: 16px; border: 1px solid var(--rp-line); border-radius: 12px; color: var(--rp-ink); background: var(--rp-surface-alt); font: 400 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }}
           .admin-table-scroll {{ max-height: 560px; overflow: auto; }}
           .admin-table-scroll thead th {{ position: sticky; top: 0; z-index: 1; background: var(--rp-surface); }}
           .table-page-size {{ width: auto; min-width: 76px; }}

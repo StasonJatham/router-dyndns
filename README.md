@@ -160,6 +160,8 @@ The generated FRITZ!Box URL uses the native placeholders:
 https://ddns.example.net/u/<random-update-slug>?myip=<ipaddr>&myipv6=<ip6addr>
 ```
 
+FRITZ!Box replaces `<ipaddr>` and `<ip6addr>` with the current WAN IPv4/IPv6 address and sends an HTTP GET request to that URL whenever it detects an address change. RouterPulse returns DynDNS-style responses such as `good 203.0.113.10`, `nochg 203.0.113.10`, `badauth`, or `nohost`.
+
 This URL is enough for routers that only expose a single update URL field and do not send separate credentials. RouterPulse also shows a `One-box update URL` that embeds `hostname`, `username`, and `password` as query parameters for clients that require credential-style DynDNS URLs but do not expose separate credential fields. Treat both URLs as secrets.
 
 The compatibility endpoint is also available:
@@ -169,6 +171,27 @@ https://ddns.example.net/nic/update?hostname=<domain>&myip=<ipaddr>&myipv6=<ip6a
 ```
 
 Prefer `/u/<slug>` for managed service use because the router request cannot change the hostname.
+
+## Manual Updates And Automation
+
+Every generated hostname can be updated with curl, cron, a shell script, Home Assistant, OpenWrt, pfSense, or any client that can send an HTTP GET request:
+
+```bash
+# Explicit IPv4 update
+curl -sS 'https://ddns.example.net/u/<random-update-slug>?myip=203.0.113.10'
+
+# Explicit IPv6 update
+curl -sS 'https://ddns.example.net/u/<random-update-slug>?myipv6=2001:db8::10'
+
+# Use the request source IP
+curl -sS 'https://ddns.example.net/u/<random-update-slug>'
+```
+
+The `/nic/update` compatibility endpoint also works for clients that expect hostname and credentials in the URL:
+
+```bash
+curl -sS 'https://ddns.example.net/nic/update?hostname=home.example.net&username=router&password=<password>&myip=203.0.113.10'
+```
 
 ## Use Your Own Subdomain With CNAME
 

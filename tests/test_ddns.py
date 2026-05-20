@@ -368,6 +368,10 @@ def test_self_service_managed_hostname_generates_random_account(tmp_path: Path) 
     assert "Kennwort (optional):" in response.text
     assert "Copy complete FRITZ!Box fields" in response.text
     assert "Copy CNAME record" in response.text
+    assert "Manual updates" in response.text
+    assert "curl -sS" in response.text
+    assert "203.0.113.10" in response.text
+    assert "2001:db8::10" in response.text
     assert "Public:" in response.text
     assert "Secret:" in response.text
     assert ".ddns.example.net" in response.text
@@ -398,6 +402,8 @@ def test_magic_hostname_without_login_generates_update_and_management_links(tmp_
     assert "Private status page:" in response.text
     assert "Copy complete FRITZ!Box fields" in response.text
     assert "Copy CNAME record" in response.text
+    assert "FRITZ!Box replaces" in response.text
+    assert "Copy curl examples" in response.text
     assert response.text.count("Secret") >= 3
     assert response.text.count("Public") >= 3
     assert ".ddns.example.net" in response.text
@@ -428,6 +434,8 @@ def test_magic_management_link_can_delete_hostname(tmp_path: Path) -> None:
     assert "Kennwort (optional):" in management.text
     assert "Copy complete FRITZ!Box fields" in management.text
     assert "Copy CNAME record" in management.text
+    assert "Manual updates" in management.text
+    assert "curl -sS" in management.text
     assert "Public:" in management.text
     assert "Secret:" in management.text
     assert "Router updates" in management.text
