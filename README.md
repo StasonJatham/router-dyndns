@@ -1,70 +1,93 @@
 # router-dyndns
 
-A small self-hosted DynDNS service for FRITZ!Box and compatible routers.
+`router-dyndns` is a small self-hosted DynDNS service for FRITZ!Box and compatible routers. It provides FRITZ!Box-ready update URLs, publishes A/AAAA records through Cloudflare or RFC 2136, and keeps the operational footprint simple enough for a small VPS.
 
-It gives users FRITZ!Box-ready DynDNS settings without requiring a full account for provider-owned hostnames. For custom domains, users verify domain ownership with a DNS TXT challenge before creating hostnames.
+## Status
+
+This project is suitable for self-hosting and private/public beta use when a real DNS backend is configured. For a larger free public service, add external abuse controls, monitoring, and a backup/restore process before launch.
 
 ## Features
 
-- FastAPI app with `/docs`, `/redoc`, and `/openapi.json`.
-- Anonymous magic URLs for provider-owned hostnames.
-- Optional user sessions for custom-domain verification and hostname quotas.
-- FRITZ!Box-compatible update URLs.
-- SQLite persistence with WAL mode.
-- SQLite-backed rate limiting for public creation and update endpoints.
-- Cloudflare DNS publishing.
-- RFC 2136 DNS publishing.
-- DNS publish-before-store update behavior.
+- FastAPI application with Swagger UI, ReDoc, and OpenAPI schema.
+- Anonymous provider-owned hostnames using cryptographically random update and management URLs.
+- Login-gated custom-domain verification with DNS TXT challenges.
+- FRITZ!Box-compatible update endpoint and a JSON API under `/api/v1`.
+- SQLite persistence with WAL mode and per-IP rate limiting.
+- Cloudflare and RFC 2136 DNS publishing.
+- Publish-before-store update behavior, with failed DNS updates logged and rejected.
 - Per-host update locking inside one server process.
-- Custom-domain TXT verification.
-- Trusted proxy configuration for `X-Forwarded-For`.
-- Docker and Caddy examples.
+- Safe trusted-proxy handling for `X-Forwarded-For`.
+- Docker Compose and Caddy examples.
 
-## Install
+## Quick Start
 
 ```bash
+git clone https://github.com/StasonJatham/router-dyndns.git
+cd router-dyndns
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-Run quality checks:
+Run locally:
 
 ```bash
-ruff check router_dyndns tests
-pytest
-```
-
-## Run Locally
-
-```bash
-export DDNS_ADMIN_PASSWORD='long-random-admin-password'
-export DDNS_SESSION_SECRET='another-long-random-secret'
-export DDNS_PUBLIC_BASE_URL='https://ddns.example.net'
+export DDNS_ADMIN_PASSWORD='replace-with-a-long-random-value'
+export DDNS_SESSION_SECRET='replace-with-a-second-long-random-value'
+export DDNS_PUBLIC_BASE_URL='http://localhost:8080'
 export DDNS_HOSTNAME_SUFFIX='ddns.example.net'
 export DDNS_DATABASE='./ddns.sqlite3'
-export DDNS_DNS_PROVIDER='cloudflare'
-export DDNS_DNS_ZONES='ddns.example.net'
-export DDNS_REQUIRE_DNS_PROVIDER=1
-export DDNS_CLOUDFLARE_API_TOKEN='cloudflare-api-token'
-export DDNS_CLOUDFLARE_ZONE_ID='cloudflare-zone-id'
-export DDNS_TRUSTED_PROXY_IPS='127.0.0.1,::1'
 
-router-dyndns serve --host 0.0.0.0 --port 8080
+router-dyndns serve --host 127.0.0.1 --port 8080
 ```
 
 Open:
 
-- Customer UI: `https://ddns.example.net/`
-- Admin UI: `https://ddns.example.net/admin`
-- Swagger UI: `https://ddns.example.net/docs`
-- ReDoc: `https://ddns.example.net/redoc`
+- Customer UI: `http://localhost:8080/`
+- Admin UI: `http://localhost:8080/admin`
+- Swagger UI: `http://localhost:8080/docs`
+- ReDoc: `http://localhost:8080/redoc`
 
-Admin auth uses HTTP Basic auth. Use any username and `DDNS_ADMIN_PASSWORD` as the password.
+Admin auth uses HTTP Basic auth. The username can be any value; the password is `DDNS_ADMIN_PASSWORD`.
+
+## Production Configuration
+
+For an internet-facing service, configure HTTPS at your reverse proxy and require a DNS backend:
+
+```bash
+export DDNS_PUBLIC_BASE_URL='https://ddns.example.net'
+export DDNS_HOSTNAME_SUFFIX='ddns.example.net'
+export DDNS_DATABASE='/data/ddns.sqlite3'
+export DDNS_REQUIRE_DNS_PROVIDER=1
+export DDNS_DNS_ZONES='ddns.example.net'
+export DDNS_TRUSTED_PROXY_IPS='127.0.0.1,::1'
+```
+
+Cloudflare:
+
+```bash
+export DDNS_DNS_PROVIDER='cloudflare'
+export DDNS_CLOUDFLARE_API_TOKEN='replace-with-cloudflare-token'
+export DDNS_CLOUDFLARE_ZONE_ID='replace-with-cloudflare-zone-id'
+export DDNS_TTL=60
+```
+
+RFC 2136:
+
+```bash
+export DDNS_DNS_PROVIDER='rfc2136'
+export DDNS_RFC2136_SERVER='127.0.0.1'
+export DDNS_RFC2136_ZONE='ddns.example.net'
+export DDNS_RFC2136_KEY_NAME='ddns-key'
+export DDNS_RFC2136_KEY_SECRET='replace-with-tsig-secret'
+export DDNS_TTL=60
+```
+
+`DDNS_DNS_ZONES` is the allowlist of zones this service may publish. A custom domain must pass TXT verification and the requested hostname must be inside one of these zones.
 
 ## FRITZ!Box Setup
 
-Users receive these fields:
+Create a hostname in the web UI. The generated page shows the exact values for the FRITZ!Box DynDNS form:
 
 - `Update-URL`
 - `Domainnamen`
@@ -77,27 +100,27 @@ The generated update URL uses FRITZ!Box placeholders:
 /u/<random-update-slug>?myip=<ipaddr>&myipv6=<ip6addr>
 ```
 
-The compatibility endpoint is also available:
+The legacy compatibility endpoint is also available:
 
 ```text
 /nic/update?hostname=<domain>&myip=<ipaddr>&myipv6=<ip6addr>&username=<username>&password=<pass>
 ```
 
-The `/u/<slug>` endpoint is safer for public service use because the user cannot alter the hostname in the router request.
+Prefer `/u/<slug>` for managed service use because the router request cannot change the hostname.
 
 ## HTTP API
 
-The API is versioned under `/api/v1`.
+The API is available under `/api/v1`.
 
-Core endpoints:
-
-- `POST /api/v1/hostnames/magic`: create a provider-owned random hostname.
-- `GET /api/v1/management/{management_slug}`: inspect a hostname by private management link.
-- `DELETE /api/v1/management/{management_slug}`: delete a hostname and DNS records.
-- `POST /api/v1/domains/challenges`: create a TXT challenge. Requires login.
-- `POST /api/v1/domains/verify`: verify a TXT challenge. Requires login.
-- `POST /api/v1/hostnames/custom`: create a custom hostname below a verified and publishable domain. Requires login.
-- `GET /api/v1/updates/{update_slug}`: JSON update endpoint.
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /api/v1/hostnames/magic` | Create an anonymous provider-owned hostname. |
+| `GET /api/v1/management/{management_slug}` | Inspect a hostname by private management link. |
+| `DELETE /api/v1/management/{management_slug}` | Delete a hostname and its DNS records. |
+| `POST /api/v1/domains/challenges` | Create a TXT challenge. Requires login. |
+| `POST /api/v1/domains/verify` | Verify a TXT challenge. Requires login. |
+| `POST /api/v1/hostnames/custom` | Create a custom hostname below a verified, publishable domain. Requires login. |
+| `GET /api/v1/updates/{update_slug}` | JSON update endpoint for routers or automation. |
 
 Example:
 
@@ -107,52 +130,25 @@ curl -sS https://ddns.example.net/api/v1/hostnames/magic \
   -d '{"username":"home-router"}'
 ```
 
-## DNS Publishing
-
-For public service use, configure a real DNS backend and set:
-
-```bash
-export DDNS_REQUIRE_DNS_PROVIDER=1
-```
-
-Cloudflare:
-
-```bash
-export DDNS_DNS_PROVIDER=cloudflare
-export DDNS_DNS_ZONES=ddns.example.net
-export DDNS_CLOUDFLARE_API_TOKEN='cloudflare-api-token'
-export DDNS_CLOUDFLARE_ZONE_ID='cloudflare-zone-id'
-export DDNS_TTL=60
-```
-
-RFC 2136:
-
-```bash
-export DDNS_DNS_PROVIDER=rfc2136
-export DDNS_DNS_ZONES=ddns.example.net
-export DDNS_RFC2136_SERVER=127.0.0.1
-export DDNS_RFC2136_ZONE=ddns.example.net
-export DDNS_RFC2136_KEY_NAME=ddns-key
-export DDNS_RFC2136_KEY_SECRET='base64-tsig-secret'
-export DDNS_TTL=60
-```
-
-`DDNS_DNS_ZONES` defines which DNS zones this service may publish. A user proving TXT control of a domain is not enough; the hostname must also be inside a zone your DNS backend can update.
-
 ## Docker
 
+Copy the example environment file and replace every placeholder:
+
 ```bash
+cp .env.example .env
 docker compose up -d --build
 ```
 
-Copy `.env.example` to `.env` and set real secrets first.
+`Caddyfile.example` contains a minimal HTTPS reverse proxy example.
 
 ## Operations
 
 - Run behind HTTPS.
+- Keep `.env` out of git.
 - Use long random values for `DDNS_ADMIN_PASSWORD` and `DDNS_SESSION_SECRET`.
+- Use a least-privilege DNS API token limited to the managed zone.
 - Configure `DDNS_TRUSTED_PROXY_IPS` only for reverse proxies that strip user-supplied forwarding headers.
-- Back up the SQLite database.
+- Back up `/data/ddns.sqlite3`.
 - Run one Uvicorn worker with SQLite. The per-host update lock is process-local.
 
 SQLite backup example:
@@ -160,3 +156,17 @@ SQLite backup example:
 ```bash
 sqlite3 /data/ddns.sqlite3 ".backup '/backups/router-dyndns.sqlite3'"
 ```
+
+## Development
+
+```bash
+ruff check router_dyndns tests
+pytest
+python -m compileall router_dyndns
+```
+
+## Security
+
+The repository intentionally contains only placeholders in `.env.example` and documentation. Do not commit a real `.env`, DNS token, TSIG secret, admin password, session secret, database, or router-generated update URL.
+
+If you find a vulnerability, open a private advisory or contact the repository owner before publishing details.
