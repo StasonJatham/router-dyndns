@@ -383,16 +383,16 @@ def _render_public_home(
     return _page(
         "router-dyndns",
         f"""
-        <main>
+        <main id="main">
           {_top_nav()}
           <section class="hero-band">
             <div class="container hero-inner">
               <p class="eyebrow">FRITZ!Box compatible</p>
-              <h1>DynDNS without the account ceremony.</h1>
+              <h1>DynDNS without signups.</h1>
               <p class="lead">Create a secure update endpoint under {suffix}. Provider hostnames are anonymous; custom domains require DNS proof.</p>
               <div class="hero-actions">
-                <a class="button" href="#create">Create hostname</a>
-                <a class="button secondary" href="#custom-domain">Use custom domain</a>
+                <a class="button" href="#create">Get a hostname</a>
+                <a class="button secondary" href="#custom-domain">Verify a domain</a>
               </div>
             </div>
           </section>
@@ -405,11 +405,12 @@ def _render_public_home(
                 <h2>Create a router update URL</h2>
                 <p class="section-copy">Generate a random hostname, paste the update URL into your router, and keep the management link private.</p>
               </div>
-              <form method="post" action="/magic" class="tool-card">
-                <label>Username
-                  <input name="username" placeholder="optional">
+              <form method="post" action="/magic" class="tool-card" aria-label="Create a generated DynDNS hostname">
+                <label>Router username
+                  <input name="username" placeholder="optional" autocomplete="off" inputmode="text">
+                  <span class="field-hint">Leave empty to generate one automatically.</span>
                 </label>
-                <button type="submit">Create hostname</button>
+                <button type="submit">Generate hostname</button>
               </form>
             </div>
           </section>
@@ -433,7 +434,8 @@ def _top_nav(label: str | None = None, links: str = "") -> str:
     if not links:
         account_html += '<a class="nav-button" href="/#custom-domain">Domain setup</a>'
     return f"""
-    <nav class="top-nav">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <nav class="top-nav" aria-label="Main navigation">
       <div class="container nav-inner">
         <a class="brand" href="/"><img src="/logo.svg" alt="" width="28" height="28">router-dyndns</a>
         <div class="nav-actions">
@@ -454,7 +456,7 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
         claim_secret = html.escape(str(challenge.get("claim_secret") or ""))
         verification_name = service.verification_name(str(challenge["domain"]))
         claim_url = service.domain_claim_url(challenge)
-        status = html.escape(message or "Add this TXT record at your DNS provider, then press the check button.")
+        status = html.escape(message or "Add this TXT record at your DNS provider, then check when it has propagated.")
         challenge_html = f"""
         <div class="step-card">
           <span class="step-number">2</span>
@@ -463,10 +465,10 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
           {_copy_row("TXT name", verification_name)}
           {_copy_row("TXT value", token)}
           {_copy_row("Private claim link", claim_url)}
-          <form method="post" action="/verify-domain" class="inline-form">
+          <form method="post" action="/verify-domain" class="inline-form" aria-label="Check DNS TXT verification">
             <input type="hidden" name="domain" value="{domain}">
             <input type="hidden" name="claim_secret" value="{claim_secret}">
-            <button type="submit">I added it, check DNS</button>
+            <button type="submit">Check DNS record</button>
           </form>
         </div>
         """
@@ -475,14 +477,15 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
             <div class="step-card">
               <span class="step-number">3</span>
               <h3>Create router hostname</h3>
-              <form method="post" action="/accounts" class="stack-form">
+              <form method="post" action="/accounts" class="stack-form" aria-label="Create custom-domain router credentials">
                 <input type="hidden" name="mode" value="custom">
                 <input type="hidden" name="claim_secret" value="{claim_secret}">
                 <label>Verified hostname
-                  <input name="hostname" placeholder="home.example.com" required>
+                  <input name="hostname" placeholder="home.example.com" autocomplete="off" autocapitalize="none" spellcheck="false" required>
                 </label>
-                <label>Username
-                  <input name="username" placeholder="optional">
+                <label>Router username
+                  <input name="username" placeholder="optional" autocomplete="off">
+                  <span class="field-hint">Leave empty to generate one automatically.</span>
                 </label>
                 <button type="submit">Create credentials</button>
               </form>
@@ -503,7 +506,7 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
         <div class="section-heading">
           <div>
             <p class="eyebrow">Custom domain</p>
-            <h2>Enter domain, add TXT, check DNS.</h2>
+            <h2>Verify DNS ownership</h2>
             <p class="section-copy">We only issue router credentials after the DNS record proves you control the domain.</p>
           </div>
         </div>
@@ -511,11 +514,11 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
           <div class="step-card">
             <span class="step-number">1</span>
             <h3>Enter domain</h3>
-            <form method="post" action="/request-domain" class="stack-form">
+            <form method="post" action="/request-domain" class="stack-form" aria-label="Request a custom domain TXT challenge">
               <label>Domain
-                <input name="domain" placeholder="example.com" required>
+                <input name="domain" placeholder="example.com" autocomplete="off" autocapitalize="none" spellcheck="false" required>
               </label>
-              <button type="submit">Generate TXT record</button>
+              <button type="submit">Create TXT challenge</button>
             </form>
           </div>
           {challenge_html}
@@ -537,7 +540,7 @@ def _credentials_panel(service: DdnsService, created_account: dict[str, str] | N
     return f"""
     <section class="section success-section">
       <div class="container">
-        <p class="eyebrow">Account generated</p>
+        <p class="eyebrow">Credentials generated</p>
         <h2>{html.escape(hostname)}</h2>
         <p class="section-copy">Save this now. The password and management link are only shown on this screen.</p>
         <div class="copy-list">
@@ -563,7 +566,7 @@ def _copy_row(label: str, value: str) -> str:
     <div class="copy-row">
       <span>{safe_label}</span>
       <code>{safe_value}</code>
-      <button type="button" class="copy-button" data-copy="{safe_value}">Copy</button>
+      <button type="button" class="copy-button" data-copy="{safe_value}" aria-label="Copy {safe_label}">Copy</button>
     </div>
     """
 
@@ -595,14 +598,14 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
     return _page(
         "DynDNS management",
         f"""
-        <main>
+        <main id="main">
           {_top_nav()}
           <section class="hero-band compact">
             <div class="container hero-inner">
               <p class="eyebrow">Magic management</p>
               <h1>{hostname}</h1>
               <p class="lead">Anyone with this link can manage or delete this hostname. Keep it private.</p>
-              <a class="button secondary" href="/">Home</a>
+              <a class="button secondary" href="/">Back home</a>
             </div>
           </section>
           <section class="section">
@@ -610,7 +613,7 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
               <div>
                 <p class="eyebrow">Router settings</p>
                 <h2>FRITZ!Box fields</h2>
-                <p class="section-copy">Use these values in the custom DynDNS provider fields.</p>
+                <p class="section-copy">Use these values in the FRITZ!Box custom DynDNS provider fields.</p>
               </div>
               <div class="copy-list">
                 {_copy_row("Update-URL:", update_url)}
@@ -640,7 +643,7 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
               <div>
                 <p class="eyebrow">Danger zone</p>
                 <h2>Delete hostname</h2>
-                <p class="section-copy">This removes the account and DNS records. The router update URL will stop working.</p>
+                <p class="section-copy">This removes the hostname and DNS records. The router update URL will stop working.</p>
               </div>
               <form method="post" action="/m/{html.escape(management_slug)}/delete">
                 <button class="danger-button" type="submit">Delete hostname</button>
@@ -660,7 +663,7 @@ def _render_admin_page(
 ) -> str:
     csrf = html.escape(admin_csrf_token(settings))
     rows = "\n".join(_account_row(account, csrf=csrf) for account in accounts) or """
-      <tr><td colspan="6" class="empty">No accounts yet.</td></tr>
+      <tr><td colspan="6" class="empty">No hostnames yet.</td></tr>
     """
     suffix_help = (
         f"Short names are expanded under {html.escape(settings.hostname_suffix)}."
@@ -670,12 +673,12 @@ def _render_admin_page(
     return _page(
         "DynDNS Admin",
         f"""
-        <main>
+        <main id="main">
           {_top_nav("Operator console", '<a href="/records">Records</a><a href="/events">Events</a>')}
           <section class="section admin-heading">
             <div class="container">
               <p class="eyebrow">DynDNS aktiv</p>
-              <h1>FRITZ!Box accounts</h1>
+              <h1>Router credentials</h1>
               <p class="lead">Create, inspect, and retire router update credentials.</p>
             </div>
           </section>
@@ -685,20 +688,21 @@ def _render_admin_page(
           <section class="section">
             <div class="container tool-grid">
               <div>
-                <p class="eyebrow">Generate account</p>
+                <p class="eyebrow">Generate credentials</p>
                 <h2>Router credentials</h2>
-                <p class="section-copy">Generated accounts produce the FRITZ!Box fields: Update-URL, Domainnamen, Benutzername, Kennwort.</p>
+                <p class="section-copy">Generated credentials produce the FRITZ!Box fields: Update-URL, Domainnamen, Benutzername, Kennwort.</p>
                 <p class="note">{suffix_help}</p>
               </div>
-              <form method="post" action="/admin/accounts" class="tool-card">
+              <form method="post" action="/admin/accounts" class="tool-card" aria-label="Create router credentials">
                 <input type="hidden" name="csrf" value="{csrf}">
                 <label>Domainnamen
-                  <input name="hostname" placeholder="home.example.net" required>
+                  <input name="hostname" placeholder="home.example.net" autocomplete="off" autocapitalize="none" spellcheck="false" required>
                 </label>
                 <label>Benutzername
-                  <input name="username" placeholder="auto-generated">
+                  <input name="username" placeholder="auto-generated" autocomplete="off">
+                  <span class="field-hint">Leave empty to generate one from the hostname.</span>
                 </label>
-                <button type="submit">Generate</button>
+                <button type="submit">Generate credentials</button>
               </form>
             </div>
           </section>
@@ -707,7 +711,7 @@ def _render_admin_page(
             <div class="container">
               <div class="section-heading">
                 <div>
-                  <p class="eyebrow">Accounts</p>
+                  <p class="eyebrow">Hostnames</p>
                   <h2>Active credentials</h2>
                 </div>
               </div>
@@ -739,7 +743,7 @@ def _account_row(account: dict[str, str | int | None], csrf: str = "") -> str:
           <form method="post" action="/admin/accounts/delete">
             <input type="hidden" name="csrf" value="{html.escape(csrf)}">
             <input type="hidden" name="hostname" value="{hostname}">
-            <button class="icon-button" title="Delete account" aria-label="Delete account">x</button>
+            <button class="icon-button" title="Delete hostname" aria-label="Delete {hostname}">x</button>
           </form>
         </td>
       </tr>
@@ -782,6 +786,8 @@ def _page(title: str, body: str) -> str:
             font: 400 16px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
           }}
           .container {{ width: min(1040px, calc(100% - 40px)); margin: 0 auto; }}
+          .skip-link {{ position: fixed; left: 16px; top: 10px; z-index: 40; transform: translateY(-140%); padding: 10px 14px; border-radius: 999px; background: var(--ink); color: #fff; text-decoration: none; font-size: 14px; transition: transform .16s ease; }}
+          .skip-link:focus {{ transform: translateY(0); }}
           .top-nav {{ position: sticky; top: 0; z-index: 20; min-height: 52px; display: flex; align-items: center; background: rgba(245, 245, 247, 0.86); border-bottom: 1px solid rgba(0, 0, 0, 0.08); backdrop-filter: saturate(180%) blur(20px); }}
           .nav-inner {{ min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }}
           .brand {{ display: inline-flex; align-items: center; gap: 9px; color: var(--ink); font-size: 15px; font-weight: 650; letter-spacing: -0.01em; text-decoration: none; white-space: nowrap; }}
@@ -792,10 +798,10 @@ def _page(title: str, body: str) -> str:
           .nav-label {{ min-width: 0; max-width: 38vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 13px; }}
           .nav-button {{ min-height: 34px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: #e8e8ed; color: var(--ink); font: inherit; font-size: 13px; font-weight: 500; text-decoration: none; cursor: pointer; }}
           .nav-button:hover {{ background: #dedee3; }}
-          .hero-band {{ min-height: calc(74vh - 52px); display: grid; align-items: center; background: var(--bg); text-align: center; padding: 84px 0; }}
-          .hero-band.compact {{ min-height: 420px; }}
+          .hero-band {{ min-height: calc(70vh - 52px); display: grid; align-items: center; background: var(--bg); text-align: center; padding: 80px 0 72px; }}
+          .hero-band.compact {{ min-height: 360px; }}
           .hero-inner {{ display: grid; justify-items: center; gap: 18px; }}
-          .section {{ padding: 72px 0; background: var(--surface); }}
+          .section {{ padding: 68px 0; background: var(--surface); }}
           .section + .section {{ border-top: 1px solid rgba(0, 0, 0, 0.04); }}
           .section-dark {{ background: var(--dark); color: #f5f5f7; border-top: 0; }}
           .success-section {{ background: #f5f5f7; }}
@@ -818,16 +824,17 @@ def _page(title: str, body: str) -> str:
           .secondary-card {{ background: #fafafc; }}
           .section-dark .step-card {{ background: #242426; border-color: rgba(255, 255, 255, 0.12); }}
           .section-dark .muted-card {{ opacity: .66; }}
-          .auth-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }}
           .step-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 28px; }}
           .stack-form {{ display: grid; gap: 16px; }}
           .inline-form {{ margin-top: 14px; }}
           label {{ display: grid; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 500; }}
           input {{ width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; color: var(--ink); font: inherit; background: #fff; outline: none; }}
           input:focus {{ border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.16); }}
+          .field-hint {{ color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.35; }}
           button, .button {{ min-height: 44px; border: 0; border-radius: 999px; padding: 0 20px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--blue); color: #fff; font: inherit; font-size: 15px; font-weight: 500; text-decoration: none; cursor: pointer; transition: background .16s ease, transform .16s ease; }}
           button:hover, .button:hover {{ background: var(--blue-hover); }}
           button:active, .button:active {{ transform: scale(.97); }}
+          button:focus-visible, .button:focus-visible, a:focus-visible, input:focus-visible {{ outline: 2px solid var(--blue); outline-offset: 3px; }}
           .secondary {{ background: #e8e8ed; color: var(--ink); }}
           .secondary:hover {{ background: #dedee3; }}
           .secondary-on-dark {{ background: transparent; color: #f5f5f7; border: 1px solid rgba(255, 255, 255, 0.36); }}
@@ -838,21 +845,29 @@ def _page(title: str, body: str) -> str:
           .copy-list {{ display: grid; gap: 10px; }}
           .copy-row {{ display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 48px; padding: 10px 10px 10px 14px; background: #fff; border: 1px solid var(--soft-line); border-radius: 8px; }}
           .copy-row span {{ color: var(--muted); font-size: 13px; }}
-          .copy-row code {{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }}
+          .copy-row code {{ min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }}
           .copy-button {{ min-height: 32px; padding: 0 12px; border-radius: 999px; background: #f5f5f7; color: var(--blue); font-size: 13px; }}
           .copy-button:hover {{ background: #e8e8ed; }}
+          .section-dark .copy-row {{ background: #1d1d1f; border-color: rgba(255, 255, 255, 0.14); }}
+          .section-dark .copy-row code {{ color: #f5f5f7; }}
           .step-number {{ width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: var(--blue); color: white; border-radius: 50%; font-size: 13px; }}
-          .table-wrap {{ overflow-x: auto; }}
+          .table-wrap {{ overflow-x: auto; border: 1px solid var(--soft-line); border-radius: 8px; }}
           table {{ width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }}
           th, td {{ border-bottom: 1px solid var(--soft-line); padding: 14px 10px; text-align: left; white-space: nowrap; }}
+          tr:last-child th, tr:last-child td {{ border-bottom: 0; }}
           th {{ color: var(--muted); font-size: 12px; font-weight: 600; }}
           .empty {{ color: var(--muted); text-align: center; padding: 28px; }}
           .icon-button {{ width: 32px; min-height: 32px; padding: 0; background: #f5f5f7; color: var(--danger); }}
           .icon-button:hover {{ background: #fff1f0; }}
+          .footer {{ padding: 28px 0; background: var(--bg); border-top: 1px solid var(--soft-line); }}
+          .footer-links {{ display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; }}
+          .footer-links a {{ color: var(--muted); font-size: 13px; text-decoration: none; }}
+          .footer-links a:hover {{ color: var(--ink); }}
           @media (max-width: 860px) {{
-            .tool-grid, .auth-grid, .step-grid {{ grid-template-columns: 1fr; }}
+            .tool-grid, .step-grid {{ grid-template-columns: 1fr; }}
             .split-row, .section-heading {{ align-items: flex-start; flex-direction: column; }}
             .section, .hero-band {{ padding: 52px 0; }}
+            .hero-band {{ min-height: auto; }}
             h1 {{ font-size: 36px; }}
             .lead {{ font-size: 17px; }}
           }}
@@ -861,9 +876,18 @@ def _page(title: str, body: str) -> str:
             .nav-inner {{ gap: 10px; }}
             .nav-actions {{ gap: 8px; }}
             .nav-label {{ display: none; }}
+            .brand {{ font-size: 14px; }}
+            .brand img {{ width: 24px; height: 24px; }}
+            .hero-actions, .button-row {{ width: 100%; flex-direction: column; }}
+            .hero-actions .button, .tool-card button, .step-card button, .danger-button {{ width: 100%; }}
+            .tool-card, .step-card, .secondary-card {{ padding: 18px; }}
             .copy-row {{ grid-template-columns: 1fr; }}
-            .copy-button {{ width: max-content; }}
+            .copy-row code {{ white-space: normal; overflow-wrap: anywhere; }}
+            .copy-button {{ width: 100%; }}
+            .table-wrap {{ margin-inline: -4px; }}
+            th, td {{ padding: 12px 9px; }}
             h1 {{ font-size: 31px; }}
+            h2 {{ font-size: 25px; }}
           }}
         </style>
         <script>
