@@ -693,9 +693,8 @@ def _render_public_home(
           {_top_nav()}
           <section class="hero-band">
             <div class="container text-center d-grid justify-items-center gap-3">
-              <img class="hero-logo" src="/logo.png" alt="" width="92" height="92">
-              <p class="eyebrow">Dynamic DNS for FRITZ!Box and any router</p>
-              <h1>The simplest way to keep a home IP updated.</h1>
+              <img class="hero-logo" src="/logo.png" alt="" width="80" height="80">
+              <h1>KarlDNS for home routers.</h1>
               <div class="install-pill mx-auto">
                 <code>{demo_update_url}</code>
               </div>
@@ -741,7 +740,6 @@ def _render_public_home(
                 </div>
               </div>
               <div class="terminal-card mt-4" aria-hidden="true">
-                <div class="terminal-dots"><span></span><span></span><span></span></div>
                 <code>$ curl -sS 'https://karldns.de/u/&lt;secret&gt;?myip=203.0.113.10'</code>
                 <code>good 203.0.113.10</code>
               </div>
@@ -752,7 +750,6 @@ def _render_public_home(
               <h2>Update from anything that can send GET.</h2>
               <p class="lead mx-auto mt-3">Use FRITZ!Box placeholders, curl, cron, Home Assistant, OpenWrt, pfSense, OPNsense, UniFi, MikroTik, or your own automation.</p>
               <div class="terminal-card text-start mt-4">
-                <div class="terminal-dots"><span></span><span></span><span></span></div>
                 <code># explicit IPv4</code>
                 <code>curl -sS 'https://karldns.de/u/&lt;secret&gt;?myip=203.0.113.10'</code>
                 <code># source IP fallback</code>
@@ -775,7 +772,7 @@ def _top_nav(label: str | None = None, links: str = "") -> str:
         account_html += '<a class="btn btn-sm btn-primary rounded-pill" href="/#create">Generate</a>'
     return f"""
     <a class="skip-link" href="#main">Skip to content</a>
-    <nav class="navbar navbar-expand-sm sticky-top navbar-blur border-bottom" aria-label="Main navigation">
+    <nav class="navbar navbar-expand-sm site-nav" aria-label="Main navigation">
       <div class="container">
         <a class="navbar-brand brand" href="/"><img src="/logo.png" alt="" width="28" height="28">KarlDNS</a>
         <div class="navbar-nav ms-auto flex-row align-items-center gap-2 gap-sm-3">
@@ -931,7 +928,7 @@ def _copy_row(label: str, value: str, sensitivity: str | None = None) -> str:
     <div class="input-group copy-field">
       <span class="input-group-text copy-label"><span>{safe_label}</span>{badge}</span>
       <code class="form-control text-truncate">{safe_value}</code>
-      <button type="button" class="btn btn-outline-secondary text-primary" data-copy="{safe_value}" aria-label="Copy {safe_label}">Copy</button>
+      <button type="button" class="btn btn-outline-secondary" data-copy="{safe_value}" aria-label="Copy {safe_label}">Copy</button>
     </div>
     """
 
@@ -1268,9 +1265,9 @@ def _account_row(account: dict[str, str | int | None], csrf: str = "") -> str:
           <form method="post" action="/admin/accounts/rotate" class="d-flex gap-2 flex-wrap">
             <input type="hidden" name="csrf" value="{html.escape(csrf)}">
             <input type="hidden" name="hostname" value="{hostname}">
-            <button name="action" value="update" class="btn btn-sm btn-light px-3 text-primary" title="Rotate update URL" aria-label="Rotate update URL for {hostname}">Update URL</button>
-            <button name="action" value="management" class="btn btn-sm btn-light px-3 text-primary" title="Rotate management link" aria-label="Rotate management link for {hostname}">Manage link</button>
-            <button name="action" value="password" class="btn btn-sm btn-light px-3 text-primary" title="Rotate router password" aria-label="Rotate router password for {hostname}">Password</button>
+            <button name="action" value="update" class="btn btn-sm btn-light px-3" title="Rotate update URL" aria-label="Rotate update URL for {hostname}">Update URL</button>
+            <button name="action" value="management" class="btn btn-sm btn-light px-3" title="Rotate management link" aria-label="Rotate management link for {hostname}">Manage link</button>
+            <button name="action" value="password" class="btn btn-sm btn-light px-3" title="Rotate router password" aria-label="Rotate router password for {hostname}">Password</button>
           </form>
         </td>
         <td>
@@ -1428,20 +1425,21 @@ def _page(title: str, body: str) -> str:
             --bs-primary: #000000;
             --bs-primary-rgb: 0, 0, 0;
             --bs-link-color: #000000;
-            --bs-link-hover-color: #525252;
+            --bs-link-hover-color: #3f3f46;
+            --bs-border-radius: 12px;
+            --bs-border-radius-sm: 10px;
+            --bs-border-radius-lg: 12px;
             --rp-bg: #ffffff;
             --rp-surface: #ffffff;
             --rp-surface-alt: #fafafa;
+            --rp-field: #f7f7f7;
             --rp-ink: #000000;
             --rp-muted: #737373;
-            --rp-charcoal: #525252;
-            --rp-mute: #a3a3a3;
+            --rp-charcoal: #52525b;
+            --rp-mute: #a1a1aa;
             --rp-line: #e5e5e5;
-            --rp-soft-line: #e5e5e5;
-            --rp-dark: #171717;
-            --rp-dark-card: #171717;
+            --rp-soft-line: #eeeeee;
             --rp-danger: #b42318;
-            --rp-nav-bg: rgba(255, 255, 255, 0.9);
             --rp-focus-ring: rgba(59, 130, 246, 0.5);
           }}
           [data-bs-theme="dark"] {{
@@ -1453,16 +1451,14 @@ def _page(title: str, body: str) -> str:
             --rp-bg: #0f1012;
             --rp-surface: #16171a;
             --rp-surface-alt: #1c1d20;
+            --rp-field: #1c1d20;
             --rp-ink: #f5f5f7;
             --rp-muted: #a1a1aa;
             --rp-charcoal: #d4d4d8;
             --rp-mute: #8f8f99;
             --rp-line: rgba(255, 255, 255, 0.16);
             --rp-soft-line: rgba(255, 255, 255, 0.1);
-            --rp-dark: #050506;
-            --rp-dark-card: #16171a;
             --rp-danger: #ff8a80;
-            --rp-nav-bg: rgba(15, 16, 18, 0.82);
           }}
           * {{ box-sizing: border-box; }}
           html {{ scroll-behavior: smooth; }}
@@ -1472,41 +1468,42 @@ def _page(title: str, body: str) -> str:
             color: var(--rp-ink);
             font: 400 16px/1.5 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           }}
+          .justify-items-center {{ justify-items: center; }}
           .container {{ max-width: 1040px; }}
           .container.narrow {{ max-width: 760px; }}
           .skip-link {{ position: fixed; left: 16px; top: 10px; z-index: 40; transform: translateY(-140%); padding: 8px 20px; border-radius: 999px; background: var(--rp-ink); color: var(--rp-bg); text-decoration: none; font-size: 14px; transition: transform .16s ease; }}
           .skip-link:focus {{ transform: translateY(0); }}
-          .navbar-blur {{ min-height: 56px; background: var(--rp-nav-bg); backdrop-filter: saturate(180%) blur(20px); }}
-          .brand {{ display: inline-flex; align-items: center; gap: 9px; color: var(--rp-ink); font-size: 15px; font-weight: 600; letter-spacing: 0; white-space: nowrap; }}
+          .site-nav {{ min-height: 64px; padding: 16px 0; background: var(--rp-bg); }}
+          .brand {{ display: inline-flex; align-items: center; gap: 8px; color: var(--rp-ink); font-size: 15px; font-weight: 500; letter-spacing: 0; white-space: nowrap; }}
           .brand:hover {{ color: var(--rp-ink); }}
-          .brand img {{ width: 24px; height: 24px; display: block; }}
-          .navbar .nav-link, .navbar-text {{ color: var(--rp-muted); font-size: 14px; font-weight: 500; }}
+          .brand img {{ width: 26px; height: 26px; display: block; }}
+          .navbar .nav-link, .navbar-text {{ color: var(--rp-muted); font-size: 14px; font-weight: 400; }}
           .navbar .nav-link:hover {{ color: var(--rp-ink); }}
-          .hero-band {{ min-height: auto; display: grid; align-items: center; background: var(--rp-bg); text-align: center; padding: 104px 0 88px; }}
+          .hero-band {{ min-height: auto; display: grid; align-items: center; background: var(--rp-bg); text-align: center; padding: 76px 0 88px; }}
           .hero-band .container {{ max-width: 720px; min-width: 0; }}
-          .hero-logo {{ width: 92px; height: 92px; margin-inline: auto; }}
-          .hero-band.compact {{ min-height: 320px; }}
-          .section {{ padding: 92px 0; background: var(--rp-surface); }}
+          .hero-logo {{ width: 80px; height: 80px; margin-inline: auto; }}
+          .hero-band.compact {{ min-height: auto; padding: 72px 0; }}
+          .section {{ padding: 96px 0; background: var(--rp-surface); }}
           .section + .section {{ border-top: 0; }}
           .success-section {{ background: var(--rp-surface); }}
           .danger-section {{ background: var(--rp-surface); border-top: 1px solid var(--rp-soft-line); }}
           .page-heading, .admin-heading .container {{ max-width: 760px; }}
           h1, h2, h3, p {{ margin: 0; }}
           h1, h2 {{ font-family: "SF Pro Rounded", ui-rounded, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
-          h1 {{ max-width: 720px; font-size: 38px; line-height: 1.1; font-weight: 500; letter-spacing: 0; }}
-          h2 {{ font-size: 30px; line-height: 1.2; font-weight: 500; letter-spacing: 0; }}
-          h3 {{ font-size: 20px; line-height: 1.4; font-weight: 500; }}
+          h1 {{ max-width: 720px; font-size: 36px; line-height: 1.12; font-weight: 500; letter-spacing: 0; }}
+          h2 {{ font-size: 28px; line-height: 1.22; font-weight: 500; letter-spacing: 0; }}
+          h3 {{ font-size: 19px; line-height: 1.35; font-weight: 500; }}
           .eyebrow {{ color: var(--rp-charcoal); font-size: 14px; font-weight: 500; letter-spacing: 0; text-transform: none; }}
           .lead {{ max-width: 660px; color: var(--rp-muted); font-size: 16px; line-height: 1.5; letter-spacing: 0; }}
           .section-copy, .intro {{ margin-top: 12px; max-width: 560px; color: var(--rp-muted); font-size: 15px; line-height: 1.5; }}
-          .install-pill {{ display: inline-flex; align-items: center; max-width: 100%; min-width: 0; min-height: 48px; padding: 12px 20px; border-radius: 9999px; background: var(--rp-surface-alt); color: var(--rp-ink); }}
-          .install-pill code {{ min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 15px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }}
+          .install-pill {{ display: inline-flex; align-items: center; max-width: 100%; min-width: 0; min-height: 48px; padding: 12px 20px; border: 1px solid var(--rp-line); border-radius: 9999px; background: var(--rp-field); color: var(--rp-ink); }}
+          .install-pill code {{ min-width: 0; overflow: hidden; color: var(--rp-ink); text-overflow: ellipsis; white-space: nowrap; font: 400 15px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }}
           .card {{ background: var(--rp-surface); border: 1px solid var(--rp-line); border-radius: 12px; box-shadow: none; }}
-          .card-body {{ padding: 24px; }}
+          .card-body {{ padding: 26px; }}
           label {{ display: grid; gap: 8px; color: var(--rp-charcoal); font-size: 14px; font-weight: 500; }}
-          .form-control, input {{ width: 100%; min-height: 40px; border: 1px solid var(--bs-border-color); border-radius: 9999px; padding: 8px 16px; color: var(--bs-body-color); font: inherit; background: var(--bs-body-bg); outline: none; }}
-          .form-select {{ border-radius: 9999px; }}
-          .form-control:focus, input:focus {{ border-color: var(--rp-ink); box-shadow: 0 0 0 .25rem var(--rp-focus-ring); }}
+          .form-control, input {{ width: 100%; min-height: 42px; border: 1px solid var(--rp-line); border-radius: 9999px; padding: 9px 16px; color: var(--bs-body-color); font: inherit; background: var(--rp-field); outline: none; }}
+          .form-select {{ min-height: 36px; border-color: var(--rp-line); border-radius: 9999px; background-color: var(--rp-field); color: var(--rp-ink); }}
+          .form-control:focus, input:focus, .form-select:focus {{ border-color: var(--rp-ink); box-shadow: 0 0 0 .25rem var(--rp-focus-ring); }}
           .btn {{ display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 9999px; font-size: 14px; font-weight: 500; line-height: 1; transition: background-color .16s ease, border-color .16s ease, transform .16s ease; }}
           .btn:not(.btn-sm) {{ min-height: 36px; padding: 8px 20px; }}
           .btn-sm {{ min-height: 32px; border-radius: 9999px; }}
@@ -1514,29 +1511,29 @@ def _page(title: str, body: str) -> str:
           .btn:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {{ outline: 2px solid var(--rp-focus-ring); outline-offset: 3px; }}
           .btn-primary {{ --bs-btn-color: #ffffff; --bs-btn-bg: #000000; --bs-btn-border-color: #000000; --bs-btn-hover-color: #ffffff; --bs-btn-hover-bg: #090909; --bs-btn-hover-border-color: #090909; --bs-btn-active-color: #ffffff; --bs-btn-active-bg: #090909; --bs-btn-active-border-color: #090909; --bs-btn-disabled-bg: var(--rp-surface-alt); --bs-btn-disabled-border-color: var(--rp-line); --bs-btn-disabled-color: var(--rp-mute); }}
           .btn-outline-primary {{ --bs-btn-color: var(--rp-ink); --bs-btn-border-color: var(--rp-line); --bs-btn-hover-color: var(--rp-ink); --bs-btn-hover-bg: var(--rp-surface-alt); --bs-btn-hover-border-color: var(--rp-line); --bs-btn-active-color: var(--rp-ink); --bs-btn-active-bg: var(--rp-surface-alt); --bs-btn-active-border-color: var(--rp-line); }}
-          .btn-outline-secondary, .btn-light {{ --bs-btn-bg: var(--rp-surface-alt); --bs-btn-border-color: var(--rp-line); --bs-btn-color: var(--rp-ink); --bs-btn-hover-bg: var(--rp-surface); --bs-btn-hover-border-color: var(--rp-line); --bs-btn-hover-color: var(--rp-ink); }}
+          .btn-outline-secondary, .btn-light {{ --bs-btn-bg: var(--rp-field); --bs-btn-border-color: var(--rp-line); --bs-btn-color: var(--rp-ink); --bs-btn-hover-bg: var(--rp-surface); --bs-btn-hover-border-color: var(--rp-line); --bs-btn-hover-color: var(--rp-ink); }}
+          .btn-outline-danger {{ --bs-btn-color: var(--rp-danger); --bs-btn-border-color: var(--rp-line); --bs-btn-hover-color: #ffffff; --bs-btn-hover-bg: var(--rp-danger); --bs-btn-hover-border-color: var(--rp-danger); }}
           .text-primary {{ color: var(--rp-ink) !important; }}
           .text-bg-primary {{ color: #ffffff !important; background-color: #000000 !important; }}
+          .text-bg-secondary, .text-bg-warning {{ color: var(--rp-charcoal) !important; background-color: var(--rp-field) !important; border: 1px solid var(--rp-line); }}
           .alert-info, .alert-warning {{ --bs-alert-color: var(--rp-charcoal); --bs-alert-bg: var(--rp-surface-alt); --bs-alert-border-color: var(--rp-line); }}
           .copy-field {{ min-width: 0; }}
-          .copy-field .input-group-text {{ min-width: 150px; color: var(--rp-muted); font-size: 13px; }}
+          .copy-field .input-group-text {{ min-width: 150px; border-color: var(--rp-line); color: var(--rp-muted); font-size: 13px; background: var(--rp-field); }}
           .copy-label {{ display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; }}
-          .copy-field .form-control {{ min-width: 0; }}
+          .copy-field .form-control {{ min-width: 0; border-color: var(--rp-line); }}
           .copy-field code.form-control {{ width: 1%; flex: 1 1 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }}
-          .copy-field code {{ min-height: 40px; margin: 0; color: var(--rp-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; line-height: 1.6; background: var(--rp-surface-alt); }}
-          .manual-code {{ overflow-x: auto; padding: 16px; border: 1px solid var(--rp-line); border-radius: 12px; color: var(--rp-ink); background: var(--rp-surface-alt); font: 400 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }}
-          .terminal-card {{ display: grid; gap: 10px; padding: 16px; border: 1px solid var(--rp-line); border-radius: 12px; color: var(--rp-ink); background: var(--rp-surface); font: 400 14px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }}
+          .copy-field code {{ min-height: 42px; margin: 0; color: var(--rp-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; line-height: 1.6; background: var(--rp-field); }}
+          .manual-code {{ overflow-x: auto; padding: 16px; border: 1px solid var(--rp-line); border-radius: 12px; color: var(--rp-ink); background: var(--rp-field); font: 400 14px/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }}
+          .terminal-card {{ display: grid; gap: 8px; padding: 18px 20px; border: 1px solid var(--rp-line); border-radius: 12px; color: var(--rp-ink); background: var(--rp-surface); font: 400 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }}
           .terminal-card code {{ display: block; overflow-wrap: anywhere; color: inherit; font: inherit; }}
-          .terminal-dots {{ display: flex; gap: 6px; margin-bottom: 6px; }}
-          .terminal-dots span {{ width: 12px; height: 12px; border-radius: 999px; background: #ff5f56; }}
-          .terminal-dots span:nth-child(2) {{ background: #ffbd2e; }}
-          .terminal-dots span:nth-child(3) {{ background: #27c93f; }}
           .admin-table-scroll {{ max-height: 560px; overflow: auto; }}
           .admin-table-scroll thead th {{ position: sticky; top: 0; z-index: 1; background: var(--rp-surface); }}
           .table-page-size {{ width: auto; min-width: 76px; }}
+          .pagination {{ --bs-pagination-color: var(--rp-muted); --bs-pagination-bg: var(--rp-surface); --bs-pagination-border-color: var(--rp-line); --bs-pagination-hover-color: var(--rp-ink); --bs-pagination-hover-bg: var(--rp-field); --bs-pagination-hover-border-color: var(--rp-line); --bs-pagination-active-color: #ffffff; --bs-pagination-active-bg: #000000; --bs-pagination-active-border-color: #000000; --bs-pagination-disabled-color: var(--rp-mute); --bs-pagination-disabled-bg: var(--rp-surface); --bs-pagination-disabled-border-color: var(--rp-line); }}
           .site-footer {{ padding: 24px 0; background: var(--rp-bg); }}
           .site-footer .nav-link:hover {{ color: var(--rp-ink) !important; }}
           table {{ width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--rp-ink); }}
+          .table {{ --bs-table-bg: transparent; --bs-table-color: var(--rp-ink); --bs-table-border-color: var(--rp-soft-line); --bs-table-hover-bg: var(--rp-field); }}
           th, td {{ border-bottom: 1px solid var(--rp-soft-line); padding: 14px 10px; text-align: left; white-space: nowrap; }}
           tr:last-child th, tr:last-child td {{ border-bottom: 0; }}
           th {{ color: var(--rp-muted); font-size: 12px; font-weight: 600; }}
@@ -1553,7 +1550,7 @@ def _page(title: str, body: str) -> str:
             .navbar .nav-link {{ display: none; }}
             .hero-band .btn, .card button {{ width: 100%; }}
             .install-pill {{ width: 100%; }}
-            .hero-logo {{ width: 76px; height: 76px; }}
+            .hero-logo {{ width: 68px; height: 68px; }}
             .copy-field {{ display: grid; }}
             .copy-field .input-group-text {{ min-width: 0; border-radius: 12px 12px 0 0; }}
             .copy-field code {{ white-space: normal; overflow-wrap: anywhere; border-radius: 0; }}
