@@ -60,7 +60,7 @@ That means users always have a current hostname for VPN, remote access, self-hos
 | Persistence | SQLite with WAL mode |
 | API | FastAPI, OpenAPI, Swagger UI, ReDoc |
 | Auth model | No user accounts. Private bearer links for hostnames and custom-domain claims |
-| Operations | Rate limiting, update logs, cleanup jobs, Docker, Caddy example |
+| Operations | Rate limiting, admin audit views, update logs, cleanup jobs, Docker, Caddy example |
 
 ## Quick Start
 
@@ -92,6 +92,8 @@ Open:
 
 Admin auth uses HTTP Basic auth. The username can be any value; the password is `DDNS_ADMIN_PASSWORD`.
 
+The public OpenAPI schema documents the developer API under `/api/v1`. Admin/operator endpoints are intentionally omitted from Swagger UI and ReDoc.
+
 ## Production Setup
 
 For an internet-facing DynDNS service, run behind HTTPS and require a real DNS backend:
@@ -103,6 +105,9 @@ export DDNS_DATABASE='/data/ddns.sqlite3'
 export DDNS_REQUIRE_DNS_PROVIDER=1
 export DDNS_DNS_ZONES='ddns.example.net'
 export DDNS_TRUSTED_PROXY_IPS='127.0.0.1,::1'
+export DDNS_RATE_LIMIT_PER_MINUTE=60
+export DDNS_ADMIN_RATE_LIMIT_PER_MINUTE=20
+export DDNS_MAX_REQUEST_BODY_BYTES=16384
 export DDNS_CLEANUP_CHALLENGE_HOURS=72
 export DDNS_CLEANUP_UNUSED_ACCOUNT_HOURS=168
 export DDNS_CLEANUP_INTERVAL_SECONDS=3600
@@ -207,14 +212,18 @@ docker compose up -d --build
 - Use a long random value for `DDNS_ADMIN_PASSWORD`.
 - Use a least-privilege DNS API token or TSIG key.
 - Configure `DDNS_TRUSTED_PROXY_IPS` only for reverse proxies that strip user-supplied forwarding headers.
+- Keep `/docs` and `/redoc` available for API users if you want a public developer surface. Admin routes are hidden from OpenAPI and still require Basic auth.
 - Leave cleanup enabled. The app periodically removes abandoned TXT challenges and generated hostnames that were never updated by a router.
 - Back up `/data/ddns.sqlite3`.
 - Run one Uvicorn worker with SQLite. The per-host update lock is process-local.
 
-Cleanup defaults:
+Security and cleanup defaults:
 
 | Variable | Default | Purpose |
 | --- | ---: | --- |
+| `DDNS_RATE_LIMIT_PER_MINUTE` | `60` | Public update/API/form requests allowed per source IP and path. |
+| `DDNS_ADMIN_RATE_LIMIT_PER_MINUTE` | `20` | Admin/operator requests allowed per source IP and path. |
+| `DDNS_MAX_REQUEST_BODY_BYTES` | `16384` | Maximum accepted request body for form/API endpoints. |
 | `DDNS_CLEANUP_CHALLENGE_HOURS` | `72` | Delete unverified DNS TXT claims after this many hours. |
 | `DDNS_CLEANUP_UNUSED_ACCOUNT_HOURS` | `168` | Delete generated hostnames that never received a router update after this many hours. |
 | `DDNS_CLEANUP_INTERVAL_SECONDS` | `3600` | Run the in-app cleanup scheduler at this interval. |
@@ -243,6 +252,6 @@ Self-hosted DynDNS, self hosted DDNS, Dynamic DNS server, FRITZ!Box DynDNS, FRIT
 
 ## Security
 
-The repository intentionally contains only placeholders in `.env.example` and documentation. Do not commit a real `.env`, DNS token, TSIG secret, admin password, session secret, database, or router-generated update URL.
+The repository intentionally contains only placeholders in `.env.example` and documentation. Do not commit a real `.env`, DNS token, TSIG secret, admin password, database, magic management link, domain claim URL, or router-generated update URL.
 
 If you find a vulnerability, open a private advisory or contact the repository owner before publishing details.

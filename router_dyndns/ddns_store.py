@@ -122,6 +122,21 @@ class DdnsStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def get_account_by_hostname(self, hostname: str) -> dict[str, str | int | None] | None:
+        with self.connect() as conn:
+            conn.row_factory = sqlite3.Row
+            account = conn.execute(
+                """
+                SELECT accounts.hostname, accounts.username, accounts.update_slug,
+                       accounts.created_at, accounts.disabled, records.ipv4, records.ipv6, records.updated_at
+                FROM accounts
+                LEFT JOIN records ON records.hostname = accounts.hostname
+                WHERE accounts.hostname = ?
+                """,
+                (hostname,),
+            ).fetchone()
+        return dict(account) if account else None
+
     def get_account_by_slug(self, update_slug: str) -> dict[str, str | int | None] | None:
         with self.connect() as conn:
             conn.row_factory = sqlite3.Row
@@ -169,6 +184,32 @@ class DdnsStore:
         with self.connect() as conn:
             conn.execute("DELETE FROM accounts WHERE hostname = ?", (hostname,))
             conn.execute("DELETE FROM records WHERE hostname = ?", (hostname,))
+
+    def rotate_update_slug(self, hostname: str) -> dict[str, str | int | None] | None:
+        update_slug = secrets.token_urlsafe(32)
+        with self.connect() as conn:
+            conn.execute("UPDATE accounts SET update_slug = ? WHERE hostname = ?", (update_slug, hostname))
+        return self.get_account_by_hostname(hostname)
+
+    def rotate_management_slug(self, hostname: str) -> dict[str, str | int | None] | None:
+        management_slug = secrets.token_urlsafe(32)
+        management_hash = hash_lookup_token(management_slug)
+        with self.connect() as conn:
+            conn.execute("UPDATE accounts SET management_hash = ? WHERE hostname = ?", (management_hash, hostname))
+        account = self.get_account_by_hostname(hostname)
+        if account:
+            account["management_slug"] = management_slug
+        return account
+
+    def rotate_password(self, hostname: str) -> dict[str, str | int | None] | None:
+        token = secrets.token_urlsafe(24)
+        token_hash = hash_secret(token)
+        with self.connect() as conn:
+            conn.execute("UPDATE accounts SET token_hash = ? WHERE hostname = ?", (token_hash, hostname))
+        account = self.get_account_by_hostname(hostname)
+        if account:
+            account["password"] = token
+        return account
 
     def create_domain_challenge(self, domain: str) -> dict[str, str]:
         token = f"ff-ddns-{secrets.token_urlsafe(24)}"
@@ -229,6 +270,20 @@ class DdnsStore:
         result["claim_secret"] = claim_secret
         return result
 
+    def list_domain_challenges(self, limit: int = 100) -> list[dict[str, str | None]]:
+        with self.connect() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT domain, created_at, verified_at
+                FROM domain_challenges
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def is_domain_verified(self, domain: str, claim_secret: str | None = None) -> bool:
         with self.connect() as conn:
             sql = "SELECT verified_at FROM domain_challenges WHERE domain = ?"
@@ -277,6 +332,20 @@ class DdnsStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def list_cleanup_runs(self, limit: int = 20) -> list[dict[str, str | int]]:
+        with self.connect() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT created_at, domain_challenges_deleted, unused_accounts_deleted
+                FROM cleanup_runs
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def allow_rate_limit(self, key: str, limit: int) -> bool:
         now = int(time.time())
         window = now // 60
@@ -318,6 +387,13 @@ class DdnsStore:
                 (unused_account_cutoff,),
             )
             conn.execute("DELETE FROM rate_limits WHERE window < ?", (int(time.time()) - 3600,))
+            conn.execute(
+                """
+                INSERT INTO cleanup_runs(created_at, domain_challenges_deleted, unused_accounts_deleted)
+                VALUES (?, ?, ?)
+                """,
+                (datetime.now(UTC).isoformat(), challenge_cursor.rowcount, account_cursor.rowcount),
+            )
         return {
             "domain_challenges": challenge_cursor.rowcount,
             "unused_accounts": account_cursor.rowcount,
@@ -352,6 +428,17 @@ class DdnsStore:
                 """
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_update_events_created_at ON update_events(created_at)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS cleanup_runs (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  created_at TEXT NOT NULL,
+                  domain_challenges_deleted INTEGER NOT NULL,
+                  unused_accounts_deleted INTEGER NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_cleanup_runs_created_at ON cleanup_runs(created_at)")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS rate_limits (

@@ -14,6 +14,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 from starlette.concurrency import run_in_threadpool
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from .ddns_api import create_api_router
 from .ddns_dns import delete_dns_records, dns_backend_configured, publish_dns
@@ -55,13 +56,41 @@ OPENAPI_TAGS = [
         "name": "management",
         "description": "Bearer-link management for generated hostnames.",
     },
-    {
-        "name": "admin",
-        "description": "Operator-only HTML and JSON endpoints protected by the admin password.",
-    },
 ]
 
 ASSET_DIR = Path(__file__).with_name("assets")
+
+
+class RequestBodyTooLargeError(Exception):
+    pass
+
+
+class RequestBodyLimitMiddleware:
+    def __init__(self, app: ASGIApp, max_body_bytes: int) -> None:
+        self.app = app
+        self.max_body_bytes = max_body_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        received = 0
+
+        async def limited_receive() -> Message:
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_body_bytes:
+                    raise RequestBodyTooLargeError
+            return message
+
+        try:
+            await self.app(scope, limited_receive, send)
+        except RequestBodyTooLargeError:
+            response = PlainTextResponse("request body too large", status_code=413)
+            await response(scope, receive, send)
 
 
 def make_app(settings: DdnsSettings | None = None) -> FastAPI:
@@ -98,17 +127,29 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
         openapi_tags=OPENAPI_TAGS,
         lifespan=lifespan,
     )
+    app.add_middleware(RequestBodyLimitMiddleware, max_body_bytes=settings.max_request_body_bytes)
     app.include_router(create_api_router(settings, store, service))
 
     @app.middleware("http")
     async def security_middleware(request: Request, call_next):
-        if is_rate_limited_path(request.url.path):
+        try:
+            content_length = int(request.headers.get("content-length", "0") or "0")
+        except ValueError:
+            content_length = 0
+        if content_length > settings.max_request_body_bytes:
+            return PlainTextResponse("request body too large", status_code=413)
+
+        if is_rate_limited_path(request.url.path) or _is_admin_path(request.url.path):
+            limit = settings.admin_rate_limit_per_minute if _is_admin_path(request.url.path) else settings.rate_limit_per_minute
             key = f"{client_ip(request, settings)}:{request.url.path}"
-            allowed = await run_in_threadpool(store.allow_rate_limit, key, settings.rate_limit_per_minute)
+            allowed = await run_in_threadpool(store.allow_rate_limit, key, limit)
             if not allowed:
                 return PlainTextResponse("rate limit exceeded", status_code=429)
 
         response = await call_next(request)
+        if _is_secret_response(request):
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Pragma"] = "no-cache"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "same-origin"
@@ -169,7 +210,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
 
     @app.post("/magic", response_class=HTMLResponse)
     async def magic_account(request: Request) -> str:
-        form = _parse_form(await request.body())
+        form = await _request_form(request, settings)
         username = _first_form_value(form, "username") or None
         account = await run_in_threadpool(service.create_managed_account, username)
         return _render_public_home(service, settings, account, None)
@@ -218,7 +259,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
 
     @app.post("/request-domain", response_class=HTMLResponse)
     async def request_domain(request: Request) -> str:
-        form = _parse_form(await request.body())
+        form = await _request_form(request, settings)
         try:
             challenge = await run_in_threadpool(
                 service.create_domain_challenge,
@@ -230,7 +271,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
 
     @app.post("/verify-domain", response_class=HTMLResponse)
     async def verify_domain(request: Request) -> str:
-        form = _parse_form(await request.body())
+        form = await _request_form(request, settings)
         domain = normalize_domain(_first_form_value(form, "domain"))
         claim_secret = _first_form_value(form, "claim_secret")
         found, challenge = await run_in_threadpool(service.verify_domain, domain, claim_secret)
@@ -241,7 +282,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
 
     @app.post("/accounts", response_class=HTMLResponse)
     async def self_service_account(request: Request) -> str:
-        form = _parse_form(await request.body())
+        form = await _request_form(request, settings)
         mode = _first_form_value(form, "mode")
         username = _first_form_value(form, "username") or None
         if mode == "managed":
@@ -256,13 +297,22 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
             )
         return _render_public_home(service, settings, account, None)
 
-    @app.get("/admin", response_class=HTMLResponse)
+    @app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
     def admin(_: None = Depends(authenticate_admin)) -> str:
-        return _render_admin_page(service, settings, store.list_accounts(), None)
+        return _render_admin_page(
+            service,
+            settings,
+            store.list_accounts(),
+            store.list_domain_challenges(),
+            store.list_cleanup_runs(),
+            store.list_update_events(25),
+            None,
+            None,
+        )
 
-    @app.post("/admin/accounts")
+    @app.post("/admin/accounts", include_in_schema=False)
     async def admin_create_account(request: Request, _: None = Depends(authenticate_admin)) -> Response:
-        form = _parse_form(await request.body())
+        form = await _request_form(request, settings)
         require_admin_csrf(settings, _first_form_value(form, "csrf"))
         hostname = normalize_hostname(_first_form_value(form, "hostname"), settings)
         username = _first_form_value(form, "username") or None
@@ -274,11 +324,22 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
             account = store.create_account(hostname, username)
         except sqlite3.IntegrityError as exc:
             raise HTTPException(status_code=409, detail="hostname already exists") from exc
-        return HTMLResponse(_render_admin_page(service, settings, store.list_accounts(), account))
+        return HTMLResponse(
+            _render_admin_page(
+                service,
+                settings,
+                store.list_accounts(),
+                store.list_domain_challenges(),
+                store.list_cleanup_runs(),
+                store.list_update_events(25),
+                account,
+                None,
+            )
+        )
 
-    @app.post("/admin/accounts/delete")
+    @app.post("/admin/accounts/delete", include_in_schema=False)
     async def admin_delete_account(request: Request, _: None = Depends(authenticate_admin)) -> Response:
-        form = _parse_form(await request.body())
+        form = await _request_form(request, settings)
         require_admin_csrf(settings, _first_form_value(form, "csrf"))
         hostname = _first_form_value(form, "hostname")
         if hostname:
@@ -288,11 +349,79 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
                 return PlainTextResponse("DNS delete failed; hostname was not deleted", status_code=500)
         return RedirectResponse("/admin", status_code=303)
 
-    @app.get("/records")
+    @app.post("/admin/accounts/rotate", include_in_schema=False)
+    async def admin_rotate_account(request: Request, _: None = Depends(authenticate_admin)) -> Response:
+        form = await _request_form(request, settings)
+        require_admin_csrf(settings, _first_form_value(form, "csrf"))
+        hostname = normalize_hostname(_first_form_value(form, "hostname"), settings, expand_suffix=False)
+        action = _first_form_value(form, "action")
+        account = store.get_account_by_hostname(hostname)
+        if not account:
+            raise HTTPException(status_code=404, detail="hostname not found")
+
+        notice = None
+        if action == "update":
+            rotated = store.rotate_update_slug(hostname)
+            notice = _admin_secret_panel("Update URL rotated", [_copy_row("Update-URL:", service.fritz_update_url(rotated))]) if rotated else None
+        elif action == "management":
+            rotated = store.rotate_management_slug(hostname)
+            notice = _admin_secret_panel("Management link rotated", [_copy_row("Magic management link:", service.magic_management_url(rotated))]) if rotated else None
+        elif action == "password":
+            rotated = store.rotate_password(hostname)
+            if rotated:
+                notice = _admin_secret_panel(
+                    "Router password rotated",
+                    [
+                        _copy_row("Domainnamen:", str(rotated["hostname"])),
+                        _copy_row("Benutzername:", str(rotated["username"])),
+                        _copy_row("Kennwort:", str(rotated["password"])),
+                    ],
+                )
+        else:
+            raise HTTPException(status_code=400, detail="invalid rotation action")
+        return HTMLResponse(
+            _render_admin_page(
+                service,
+                settings,
+                store.list_accounts(),
+                store.list_domain_challenges(),
+                store.list_cleanup_runs(),
+                store.list_update_events(25),
+                None,
+                notice,
+            )
+        )
+
+    @app.post("/admin/cleanup", include_in_schema=False)
+    async def admin_run_cleanup(request: Request, _: None = Depends(authenticate_admin)) -> Response:
+        form = await _request_form(request, settings)
+        require_admin_csrf(settings, _first_form_value(form, "csrf"))
+        result = await run_in_threadpool(store.cleanup, settings.cleanup_challenge_hours, settings.cleanup_unused_account_hours)
+        notice = _admin_secret_panel(
+            "Cleanup completed",
+            [
+                _copy_row("Domain claims removed", str(result["domain_challenges"])),
+                _copy_row("Unused hostnames removed", str(result["unused_accounts"])),
+            ],
+        )
+        return HTMLResponse(
+            _render_admin_page(
+                service,
+                settings,
+                store.list_accounts(),
+                store.list_domain_challenges(),
+                store.list_cleanup_runs(),
+                store.list_update_events(25),
+                None,
+                notice,
+            )
+        )
+
+    @app.get("/records", include_in_schema=False)
     def records(_: None = Depends(authenticate_admin)) -> list[dict[str, str | None]]:
         return store.list_records()
 
-    @app.get("/events")
+    @app.get("/events", include_in_schema=False)
     def events(_: None = Depends(authenticate_admin)) -> list[dict[str, str | None]]:
         return store.list_update_events()
 
@@ -365,8 +494,28 @@ def _parse_form(body: bytes) -> dict[str, list[str]]:
     return urllib.parse.parse_qs(body.decode("utf-8"), keep_blank_values=True)
 
 
+async def _request_form(request: Request, settings: DdnsSettings) -> dict[str, list[str]]:
+    body = await request.body()
+    if len(body) > settings.max_request_body_bytes:
+        raise HTTPException(status_code=413, detail="request body too large")
+    return _parse_form(body)
+
+
 def _first_form_value(form: dict[str, list[str]], key: str) -> str:
     return form.get(key, [""])[0].strip()
+
+
+def _is_admin_path(path: str) -> bool:
+    return path == "/admin" or path.startswith("/admin/") or path in {"/records", "/events"}
+
+
+def _is_secret_response(request: Request) -> bool:
+    path = request.url.path
+    if _is_admin_path(path) or path.startswith(("/m/", "/d/")):
+        return True
+    if path.startswith(("/api/v1/hostnames/", "/api/v1/domains/")):
+        return request.method in {"POST", "DELETE"}
+    return request.method == "POST" and path in {"/magic", "/request-domain", "/verify-domain", "/accounts"}
 
 
 def _render_public_home(
@@ -559,6 +708,21 @@ def _created_account_panel(service: DdnsService, created_account: dict[str, str]
     return _credentials_panel(service, created_account)
 
 
+def _admin_secret_panel(title: str, rows: list[str]) -> str:
+    return f"""
+    <section class="section success-section">
+      <div class="container">
+        <p class="eyebrow">Admin action</p>
+        <h2>{html.escape(title)}</h2>
+        <p class="section-copy">Copy this now. Secret values are only shown in this response.</p>
+        <div class="copy-list">
+          {"".join(rows)}
+        </div>
+      </div>
+    </section>
+    """
+
+
 def _copy_row(label: str, value: str) -> str:
     safe_label = html.escape(label)
     safe_value = html.escape(value)
@@ -659,11 +823,24 @@ def _render_admin_page(
     service: DdnsService,
     settings: DdnsSettings,
     accounts: list[dict[str, str | int | None]],
+    domain_challenges: list[dict[str, str | None]],
+    cleanup_runs: list[dict[str, str | int]],
+    update_events: list[dict[str, str | None]],
     created_account: dict[str, str] | None,
+    notice_html: str | None,
 ) -> str:
     csrf = html.escape(admin_csrf_token(settings))
     rows = "\n".join(_account_row(account, csrf=csrf) for account in accounts) or """
-      <tr><td colspan="6" class="empty">No hostnames yet.</td></tr>
+      <tr><td colspan="7" class="empty">No hostnames yet.</td></tr>
+    """
+    domain_rows = "\n".join(_domain_claim_row(challenge) for challenge in domain_challenges) or """
+      <tr><td colspan="4" class="empty">No domain claims yet.</td></tr>
+    """
+    cleanup_rows = "\n".join(_cleanup_row(run) for run in cleanup_runs) or """
+      <tr><td colspan="3" class="empty">No cleanup runs yet.</td></tr>
+    """
+    event_rows = "\n".join(_event_row(event) for event in update_events) or """
+      <tr><td colspan="6" class="empty">No update events yet.</td></tr>
     """
     suffix_help = (
         f"Short names are expanded under {html.escape(settings.hostname_suffix)}."
@@ -684,6 +861,21 @@ def _render_admin_page(
           </section>
 
           {_created_account_panel(service, created_account)}
+          {notice_html or ""}
+
+          <section class="section">
+            <div class="container tool-grid">
+              <div>
+                <p class="eyebrow">Service health</p>
+                <h2>Scheduled cleanup</h2>
+                <p class="section-copy">Cleanup runs every {html.escape(str(settings.cleanup_interval_seconds))} seconds. It removes unverified domain claims after {html.escape(str(settings.cleanup_challenge_hours))} hours and never-used generated hostnames after {html.escape(str(settings.cleanup_unused_account_hours))} hours.</p>
+              </div>
+              <form method="post" action="/admin/cleanup" class="tool-card" aria-label="Run cleanup now">
+                <input type="hidden" name="csrf" value="{csrf}">
+                <button type="submit">Run cleanup now</button>
+              </form>
+            </div>
+          </section>
 
           <section class="section">
             <div class="container tool-grid">
@@ -718,9 +910,60 @@ def _render_admin_page(
               <div class="table-wrap">
                 <table>
                   <thead>
-                    <tr><th>Domain</th><th>User</th><th>IPv4</th><th>IPv6</th><th>Updated</th><th></th></tr>
+                    <tr><th>Domain</th><th>User</th><th>IPv4</th><th>IPv6</th><th>Updated</th><th>Links</th><th></th></tr>
                   </thead>
                   <tbody>{rows}</tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="container">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Domain claims</p>
+                  <h2>Verification lifecycle</h2>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Domain</th><th>Status</th><th>Created</th><th>Verified</th></tr></thead>
+                  <tbody>{domain_rows}</tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="container">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Cleanup</p>
+                  <h2>Recent runs</h2>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Time</th><th>Domain claims removed</th><th>Unused hostnames removed</th></tr></thead>
+                  <tbody>{cleanup_rows}</tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="container">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Updates</p>
+                  <h2>Recent events</h2>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Time</th><th>Domain</th><th>Status</th><th>IPv4</th><th>IPv6</th><th>Detail</th></tr></thead>
+                  <tbody>{event_rows}</tbody>
                 </table>
               </div>
             </div>
@@ -740,6 +983,15 @@ def _account_row(account: dict[str, str | int | None], csrf: str = "") -> str:
       <tr>
         <td>{hostname}</td><td>{username}</td><td>{ipv4}</td><td>{ipv6}</td><td>{updated}</td>
         <td>
+          <form method="post" action="/admin/accounts/rotate" class="table-actions">
+            <input type="hidden" name="csrf" value="{html.escape(csrf)}">
+            <input type="hidden" name="hostname" value="{hostname}">
+            <button name="action" value="update" class="small-button" title="Rotate update URL" aria-label="Rotate update URL for {hostname}">Update URL</button>
+            <button name="action" value="management" class="small-button" title="Rotate management link" aria-label="Rotate management link for {hostname}">Manage link</button>
+            <button name="action" value="password" class="small-button" title="Rotate router password" aria-label="Rotate router password for {hostname}">Password</button>
+          </form>
+        </td>
+        <td>
           <form method="post" action="/admin/accounts/delete">
             <input type="hidden" name="csrf" value="{html.escape(csrf)}">
             <input type="hidden" name="hostname" value="{hostname}">
@@ -748,6 +1000,31 @@ def _account_row(account: dict[str, str | int | None], csrf: str = "") -> str:
         </td>
       </tr>
     """
+
+
+def _domain_claim_row(challenge: dict[str, str | None]) -> str:
+    domain = html.escape(str(challenge["domain"]))
+    created = html.escape(str(challenge.get("created_at") or "-"))
+    verified = html.escape(str(challenge.get("verified_at") or "-"))
+    status = "Verified" if challenge.get("verified_at") else "Pending"
+    return f"<tr><td>{domain}</td><td>{status}</td><td>{created}</td><td>{verified}</td></tr>"
+
+
+def _cleanup_row(run: dict[str, str | int]) -> str:
+    created = html.escape(str(run.get("created_at") or "-"))
+    domains = html.escape(str(run.get("domain_challenges_deleted") or 0))
+    accounts = html.escape(str(run.get("unused_accounts_deleted") or 0))
+    return f"<tr><td>{created}</td><td>{domains}</td><td>{accounts}</td></tr>"
+
+
+def _event_row(event: dict[str, str | None]) -> str:
+    created = html.escape(str(event.get("created_at") or "-"))
+    hostname = html.escape(str(event.get("hostname") or "-"))
+    status = html.escape(str(event.get("status") or "-"))
+    ipv4 = html.escape(str(event.get("ipv4") or "-"))
+    ipv6 = html.escape(str(event.get("ipv6") or "-"))
+    detail = html.escape(str(event.get("detail") or "-"))
+    return f"<tr><td>{created}</td><td>{hostname}</td><td>{status}</td><td>{ipv4}</td><td>{ipv6}</td><td>{detail}</td></tr>"
 
 
 def _page(title: str, body: str) -> str:
@@ -859,6 +1136,9 @@ def _page(title: str, body: str) -> str:
           .empty {{ color: var(--muted); text-align: center; padding: 28px; }}
           .icon-button {{ width: 32px; min-height: 32px; padding: 0; background: #f5f5f7; color: var(--danger); }}
           .icon-button:hover {{ background: #fff1f0; }}
+          .table-actions {{ display: flex; gap: 6px; flex-wrap: wrap; }}
+          .small-button {{ min-height: 32px; padding: 0 11px; background: #f5f5f7; color: var(--blue); font-size: 12px; }}
+          .small-button:hover {{ background: #e8e8ed; }}
           .footer {{ padding: 28px 0; background: var(--bg); border-top: 1px solid var(--soft-line); }}
           .footer-links {{ display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; }}
           .footer-links a {{ color: var(--muted); font-size: 13px; text-decoration: none; }}

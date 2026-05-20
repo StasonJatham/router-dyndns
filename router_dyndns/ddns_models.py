@@ -16,6 +16,8 @@ class DdnsSettings(BaseModel):
     hostname_suffix: str = Field(default="")
     verification_prefix: str = Field(default="_router_dyndns-ddns")
     rate_limit_per_minute: int = Field(default=60, ge=1, le=10_000)
+    admin_rate_limit_per_minute: int = Field(default=20, ge=1, le=10_000)
+    max_request_body_bytes: int = Field(default=16_384, ge=1024, le=1_048_576)
     trusted_proxy_ips: set[str] = Field(default_factory=set)
     rfc2136_server: str | None = None
     rfc2136_zone: str | None = None
@@ -56,6 +58,8 @@ class DdnsSettings(BaseModel):
             hostname_suffix=os.getenv("DDNS_HOSTNAME_SUFFIX", ""),
             verification_prefix=os.getenv("DDNS_VERIFICATION_PREFIX", "_router_dyndns-ddns"),
             rate_limit_per_minute=_env_int("DDNS_RATE_LIMIT_PER_MINUTE", 60),
+            admin_rate_limit_per_minute=_env_int("DDNS_ADMIN_RATE_LIMIT_PER_MINUTE", 20),
+            max_request_body_bytes=_env_int("DDNS_MAX_REQUEST_BODY_BYTES", 16_384),
             trusted_proxy_ips=trusted_proxy_ips,
             rfc2136_server=os.getenv("DDNS_RFC2136_SERVER") or None,
             rfc2136_zone=os.getenv("DDNS_RFC2136_ZONE") or None,

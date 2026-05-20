@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 import router_dyndns.ddns_service as ddns_service
 from router_dyndns.ddns import DdnsSettings, DdnsStore, make_app
+from router_dyndns.ddns_security import admin_csrf_token
 
 
 def test_update_accepts_fritzbox_placeholders(tmp_path: Path) -> None:
@@ -152,16 +153,24 @@ def test_generated_account_cannot_update_other_hostname(tmp_path: Path) -> None:
 
 
 def test_admin_page_shows_account_form(tmp_path: Path) -> None:
-    app = make_app(DdnsSettings(database_path=tmp_path / "ddns.sqlite3", admin_password="admin"))
+    database_path = tmp_path / "ddns.sqlite3"
+    store = DdnsStore(database_path)
+    store.create_domain_challenge("example.net")
+    app = make_app(DdnsSettings(database_path=database_path, admin_password="admin"))
     client = TestClient(app)
 
     response = client.get("/admin", auth=("admin", "admin"))
 
     assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
     assert "Update-URL" in response.text
     assert "Domainnamen" in response.text
     assert "Benutzername" in response.text
     assert "Kennwort" in response.text
+    assert "Scheduled cleanup" in response.text
+    assert "Domain claims" in response.text
+    assert "Recent events" in response.text
+    assert "example.net" in response.text
 
 
 def test_admin_posts_require_csrf(tmp_path: Path) -> None:
@@ -184,6 +193,63 @@ def test_admin_password_query_string_is_rejected(tmp_path: Path) -> None:
     response = client.get("/admin", params={"password": "admin"})
 
     assert response.status_code == 401
+
+
+def test_admin_routes_are_rate_limited(tmp_path: Path) -> None:
+    app = make_app(
+        DdnsSettings(
+            database_path=tmp_path / "ddns.sqlite3",
+            admin_password="admin",
+            admin_rate_limit_per_minute=1,
+        )
+    )
+    client = TestClient(app)
+
+    first = client.get("/admin", auth=("admin", "wrong"))
+    second = client.get("/admin", auth=("admin", "wrong"))
+
+    assert first.status_code == 401
+    assert second.status_code == 429
+
+
+def test_admin_can_rotate_links_and_password(tmp_path: Path) -> None:
+    settings = DdnsSettings(
+        database_path=tmp_path / "ddns.sqlite3",
+        admin_password="admin",
+        public_base_url="http://ddns.example.net",
+    )
+    store = DdnsStore(settings.database_path)
+    account = store.create_account("home.example.net", "router")
+    app = make_app(settings)
+    client = TestClient(app)
+    csrf = admin_csrf_token(settings)
+
+    update = client.post(
+        "/admin/accounts/rotate",
+        auth=("admin", "admin"),
+        data={"csrf": csrf, "hostname": "home.example.net", "action": "update"},
+    )
+    assert update.status_code == 200
+    assert "Update URL rotated" in update.text
+    assert client.get(f"/u/{account['update_slug']}", params={"myip": "203.0.113.9"}).status_code == 404
+
+    management = client.post(
+        "/admin/accounts/rotate",
+        auth=("admin", "admin"),
+        data={"csrf": csrf, "hostname": "home.example.net", "action": "management"},
+    )
+    assert management.status_code == 200
+    assert "Management link rotated" in management.text
+    assert "/m/" in management.text
+
+    password = client.post(
+        "/admin/accounts/rotate",
+        auth=("admin", "admin"),
+        data={"csrf": csrf, "hostname": "home.example.net", "action": "password"},
+    )
+    assert password.status_code == 200
+    assert "Router password rotated" in password.text
+    assert "Kennwort:" in password.text
 
 
 def test_self_service_managed_hostname_generates_random_account(tmp_path: Path) -> None:
@@ -325,7 +391,11 @@ def test_api_docs_include_versioned_ddns_api(tmp_path: Path) -> None:
     assert redoc.status_code == 200
     assert "/api/v1/hostnames/magic" in schema["paths"]
     assert "/api/v1/updates/{update_slug}" in schema["paths"]
+    assert "/admin" not in schema["paths"]
+    assert "/records" not in schema["paths"]
+    assert "/events" not in schema["paths"]
     assert any(tag["name"] == "hostnames" for tag in schema["tags"])
+    assert all(tag["name"] != "admin" for tag in schema["tags"])
 
 
 def test_api_magic_hostname_lifecycle(tmp_path: Path) -> None:
@@ -341,6 +411,7 @@ def test_api_magic_hostname_lifecycle(tmp_path: Path) -> None:
 
     created = client.post("/api/v1/hostnames/magic", json={"username": "router"})
     assert created.status_code == 201
+    assert created.headers["cache-control"] == "no-store"
     body = created.json()
     assert body["hostname"].endswith(".ddns.example.net")
     assert body["update_url"].startswith("http://ddns.example.net/u/")
@@ -436,6 +507,39 @@ def test_api_creation_is_rate_limited(tmp_path: Path) -> None:
 
     assert first.status_code == 201
     assert second.status_code == 429
+
+
+def test_secret_html_responses_are_not_cached(tmp_path: Path) -> None:
+    app = make_app(
+        DdnsSettings(
+            database_path=tmp_path / "ddns.sqlite3",
+            admin_password="admin",
+            hostname_suffix="ddns.example.net",
+        )
+    )
+    client = TestClient(app)
+
+    created = client.post("/magic", data={"username": "router"})
+
+    assert created.status_code == 200
+    assert created.headers["cache-control"] == "no-store"
+    assert created.headers["pragma"] == "no-cache"
+
+
+def test_oversized_request_body_is_rejected(tmp_path: Path) -> None:
+    app = make_app(
+        DdnsSettings(
+            database_path=tmp_path / "ddns.sqlite3",
+            admin_password="admin",
+            hostname_suffix="ddns.example.net",
+            max_request_body_bytes=1024,
+        )
+    )
+    client = TestClient(app)
+
+    response = client.post("/magic", data={"username": "x" * 2000})
+
+    assert response.status_code == 413
 
 
 def test_untrusted_forwarded_for_does_not_bypass_rate_limit(tmp_path: Path) -> None:
