@@ -677,7 +677,7 @@ def _render_public_home(
             </div>
           </section>
           {challenge_html}
-          <footer class="py-4 bg-body-tertiary border-top">
+          <footer class="py-4 bg-body border-top">
             <div class="container nav justify-content-center gap-3">
               <a class="nav-link p-0 small text-secondary" href="/docs">API docs</a>
               <a class="nav-link p-0 small text-secondary" href="/redoc">ReDoc</a>
@@ -771,7 +771,7 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
             """
 
     return f"""
-    <section class="section section-dark" id="custom-domain">
+    <section class="section" id="custom-domain">
       <div class="container">
         <div class="d-flex align-items-md-center justify-content-between gap-4 flex-column flex-md-row">
           <div>
@@ -1261,22 +1261,24 @@ def _page(title: str, body: str) -> str:
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
         <style>
           :root {{
-            --bs-primary: #088a5b;
-            --bs-primary-rgb: 8, 138, 91;
-            --bs-link-color: #088a5b;
-            --bs-link-hover-color: #066b47;
-            --rp-bg: #f6f8f6;
+            --bs-primary: #000000;
+            --bs-primary-rgb: 0, 0, 0;
+            --bs-link-color: #000000;
+            --bs-link-hover-color: #525252;
+            --rp-bg: #ffffff;
             --rp-surface: #ffffff;
-            --rp-surface-alt: #f0f5f2;
-            --rp-ink: #18211d;
-            --rp-muted: #637067;
-            --rp-line: rgba(0, 0, 0, 0.1);
-            --rp-soft-line: rgba(0, 0, 0, 0.06);
-            --rp-dark: #111816;
-            --rp-dark-card: #1a2521;
+            --rp-surface-alt: #fafafa;
+            --rp-ink: #000000;
+            --rp-muted: #737373;
+            --rp-charcoal: #525252;
+            --rp-mute: #a3a3a3;
+            --rp-line: #e5e5e5;
+            --rp-soft-line: #e5e5e5;
+            --rp-dark: #171717;
+            --rp-dark-card: #171717;
             --rp-danger: #b42318;
-            --rp-nav-bg: rgba(246, 248, 246, 0.88);
-            --rp-shadow: 0 18px 48px rgba(24, 33, 29, 0.08);
+            --rp-nav-bg: rgba(255, 255, 255, 0.9);
+            --rp-focus-ring: rgba(59, 130, 246, 0.5);
           }}
           [data-bs-theme="dark"] {{
             --bs-body-bg: #0f1012;
@@ -1286,16 +1288,17 @@ def _page(title: str, body: str) -> str:
             --bs-tertiary-bg: #1c1d20;
             --rp-bg: #0f1012;
             --rp-surface: #16171a;
-            --rp-surface-alt: #1b231f;
+            --rp-surface-alt: #1c1d20;
             --rp-ink: #f5f5f7;
             --rp-muted: #a1a1aa;
+            --rp-charcoal: #d4d4d8;
+            --rp-mute: #8f8f99;
             --rp-line: rgba(255, 255, 255, 0.16);
             --rp-soft-line: rgba(255, 255, 255, 0.1);
             --rp-dark: #050506;
             --rp-dark-card: #16171a;
             --rp-danger: #ff8a80;
             --rp-nav-bg: rgba(15, 16, 18, 0.82);
-            --rp-shadow: none;
           }}
           * {{ box-sizing: border-box; }}
           html {{ scroll-behavior: smooth; }}
@@ -1303,49 +1306,52 @@ def _page(title: str, body: str) -> str:
             min-height: 100vh;
             background: var(--rp-bg);
             color: var(--rp-ink);
-            font: 400 16px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+            font: 400 16px/1.5 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           }}
           .container {{ max-width: 1040px; }}
-          .skip-link {{ position: fixed; left: 16px; top: 10px; z-index: 40; transform: translateY(-140%); padding: 10px 14px; border-radius: 999px; background: var(--rp-ink); color: var(--rp-bg); text-decoration: none; font-size: 14px; transition: transform .16s ease; }}
+          .skip-link {{ position: fixed; left: 16px; top: 10px; z-index: 40; transform: translateY(-140%); padding: 8px 20px; border-radius: 999px; background: var(--rp-ink); color: var(--rp-bg); text-decoration: none; font-size: 14px; transition: transform .16s ease; }}
           .skip-link:focus {{ transform: translateY(0); }}
           .navbar-blur {{ min-height: 56px; background: var(--rp-nav-bg); backdrop-filter: saturate(180%) blur(20px); }}
-          .brand {{ display: inline-flex; align-items: center; gap: 9px; color: var(--rp-ink); font-size: 15px; font-weight: 650; letter-spacing: -0.01em; white-space: nowrap; }}
+          .brand {{ display: inline-flex; align-items: center; gap: 9px; color: var(--rp-ink); font-size: 15px; font-weight: 600; letter-spacing: 0; white-space: nowrap; }}
           .brand:hover {{ color: var(--rp-ink); }}
           .brand img {{ width: 28px; height: 28px; display: block; }}
-          .navbar .nav-link, .navbar-text {{ color: var(--rp-muted); font-size: 13px; }}
+          .navbar .nav-link, .navbar-text {{ color: var(--rp-muted); font-size: 14px; font-weight: 500; }}
           .navbar .nav-link:hover {{ color: var(--rp-ink); }}
-          .hero-band {{ min-height: calc(70vh - 56px); display: grid; align-items: center; background: var(--rp-bg); text-align: center; padding: 88px 0 76px; }}
-          .hero-band.compact {{ min-height: 360px; }}
-          .section {{ padding: 68px 0; background: var(--rp-surface); }}
-          .section + .section {{ border-top: 1px solid var(--rp-soft-line); }}
-          .section-dark {{ background: var(--rp-dark); color: #f5f5f7; border-top: 0; }}
-          .success-section {{ background: var(--rp-bg); }}
+          .hero-band {{ min-height: auto; display: grid; align-items: center; background: var(--rp-bg); text-align: center; padding: 88px 0; }}
+          .hero-band .container {{ max-width: 720px; }}
+          .hero-band.compact {{ min-height: 320px; }}
+          .section {{ padding: 88px 0; background: var(--rp-surface); }}
+          .section + .section {{ border-top: 0; }}
+          .success-section {{ background: var(--rp-surface); }}
           .danger-section {{ background: var(--rp-surface); border-top: 1px solid var(--rp-soft-line); }}
           .page-heading, .admin-heading .container {{ max-width: 760px; }}
           h1, h2, h3, p {{ margin: 0; }}
-          h1 {{ max-width: 760px; font-size: 52px; line-height: 1.06; font-weight: 700; letter-spacing: -0.02em; }}
-          h2 {{ font-size: 28px; line-height: 1.16; font-weight: 600; letter-spacing: -0.015em; }}
-          h3 {{ font-size: 18px; line-height: 1.25; font-weight: 600; }}
-          .eyebrow {{ color: var(--bs-primary); font-size: 13px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }}
-          .lead {{ max-width: 660px; color: var(--rp-muted); font-size: 19px; line-height: 1.47; letter-spacing: -0.01em; }}
-          .section-dark .lead, .section-dark .section-copy {{ color: #cccccc; }}
-          .section-dark .text-secondary {{ color: #cccccc !important; }}
+          h1, h2 {{ font-family: "SF Pro Rounded", ui-rounded, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }}
+          h1 {{ max-width: 720px; font-size: 36px; line-height: 1.11; font-weight: 500; letter-spacing: 0; }}
+          h2 {{ font-size: 30px; line-height: 1.2; font-weight: 500; letter-spacing: 0; }}
+          h3 {{ font-size: 20px; line-height: 1.4; font-weight: 500; }}
+          .eyebrow {{ color: var(--rp-charcoal); font-size: 14px; font-weight: 500; letter-spacing: 0; text-transform: none; }}
+          .lead {{ max-width: 660px; color: var(--rp-muted); font-size: 16px; line-height: 1.5; letter-spacing: 0; }}
           .section-copy, .intro {{ margin-top: 12px; max-width: 560px; color: var(--rp-muted); font-size: 15px; line-height: 1.5; }}
-          .card {{ background: var(--rp-surface); border-color: var(--rp-line); border-radius: 1rem; box-shadow: var(--rp-shadow); }}
-          .section-dark .card {{ background: var(--rp-dark-card); border-color: rgba(255, 255, 255, 0.14); color: #f5f5f7; }}
-          label {{ display: grid; gap: 8px; color: var(--rp-muted); font-size: 13px; font-weight: 600; }}
-          input {{ width: 100%; min-height: 46px; border: 1px solid var(--bs-border-color); border-radius: .75rem; padding: 10px 13px; color: var(--bs-body-color); font: inherit; background: var(--bs-body-bg); outline: none; }}
-          input:focus {{ border-color: var(--bs-primary); box-shadow: 0 0 0 .25rem rgba(var(--bs-primary-rgb), .16); }}
-          .btn {{ display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 650; transition: background-color .16s ease, border-color .16s ease, transform .16s ease; }}
-          .btn:not(.btn-sm) {{ min-height: 44px; font-size: 15px; }}
-          .btn-sm {{ min-height: 32px; }}
+          .card {{ background: var(--rp-surface); border: 1px solid var(--rp-line); border-radius: 12px; box-shadow: none; }}
+          label {{ display: grid; gap: 8px; color: var(--rp-charcoal); font-size: 14px; font-weight: 500; }}
+          .form-control, input {{ width: 100%; min-height: 40px; border: 1px solid var(--bs-border-color); border-radius: 9999px; padding: 8px 16px; color: var(--bs-body-color); font: inherit; background: var(--bs-body-bg); outline: none; }}
+          .form-select {{ border-radius: 9999px; }}
+          .form-control:focus, input:focus {{ border-color: var(--rp-ink); box-shadow: 0 0 0 .25rem var(--rp-focus-ring); }}
+          .btn {{ display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 9999px; font-size: 14px; font-weight: 500; line-height: 1; transition: background-color .16s ease, border-color .16s ease, transform .16s ease; }}
+          .btn:not(.btn-sm) {{ min-height: 36px; padding: 8px 20px; }}
+          .btn-sm {{ min-height: 32px; border-radius: 9999px; }}
           .btn:active {{ transform: scale(.97); }}
-          .btn:focus-visible, a:focus-visible, input:focus-visible {{ outline: 2px solid var(--bs-primary); outline-offset: 3px; }}
-          .btn-light {{ --bs-btn-bg: var(--rp-surface-alt); --bs-btn-border-color: var(--rp-line); --bs-btn-color: var(--rp-ink); --bs-btn-hover-bg: var(--bs-tertiary-bg); --bs-btn-hover-border-color: var(--rp-line); --bs-btn-hover-color: var(--rp-ink); }}
+          .btn:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {{ outline: 2px solid var(--rp-focus-ring); outline-offset: 3px; }}
+          .btn-primary {{ --bs-btn-color: #ffffff; --bs-btn-bg: #000000; --bs-btn-border-color: #000000; --bs-btn-hover-color: #ffffff; --bs-btn-hover-bg: #090909; --bs-btn-hover-border-color: #090909; --bs-btn-active-color: #ffffff; --bs-btn-active-bg: #090909; --bs-btn-active-border-color: #090909; --bs-btn-disabled-bg: var(--rp-surface-alt); --bs-btn-disabled-border-color: var(--rp-line); --bs-btn-disabled-color: var(--rp-mute); }}
+          .btn-outline-primary {{ --bs-btn-color: var(--rp-ink); --bs-btn-border-color: var(--rp-line); --bs-btn-hover-color: var(--rp-ink); --bs-btn-hover-bg: var(--rp-surface-alt); --bs-btn-hover-border-color: var(--rp-line); --bs-btn-active-color: var(--rp-ink); --bs-btn-active-bg: var(--rp-surface-alt); --bs-btn-active-border-color: var(--rp-line); }}
+          .btn-outline-secondary, .btn-light {{ --bs-btn-bg: var(--rp-surface-alt); --bs-btn-border-color: var(--rp-line); --bs-btn-color: var(--rp-ink); --bs-btn-hover-bg: var(--rp-surface); --bs-btn-hover-border-color: var(--rp-line); --bs-btn-hover-color: var(--rp-ink); }}
+          .text-primary {{ color: var(--rp-ink) !important; }}
+          .text-bg-primary {{ color: #ffffff !important; background-color: #000000 !important; }}
+          .alert-info, .alert-warning {{ --bs-alert-color: var(--rp-charcoal); --bs-alert-bg: var(--rp-surface-alt); --bs-alert-border-color: var(--rp-line); }}
           .copy-field .input-group-text {{ min-width: 150px; color: var(--rp-muted); font-size: 13px; }}
           .copy-label {{ display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; }}
-          .copy-field code {{ min-height: 44px; margin: 0; color: var(--rp-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.6; background: var(--bs-body-bg); }}
-          .section-dark .copy-field code {{ color: #f5f5f7; background: #1d1d1f; }}
+          .copy-field code {{ min-height: 40px; margin: 0; color: var(--rp-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; line-height: 1.6; background: var(--rp-surface-alt); }}
           .admin-table-scroll {{ max-height: 560px; overflow: auto; }}
           .admin-table-scroll thead th {{ position: sticky; top: 0; z-index: 1; background: var(--rp-surface); }}
           .table-page-size {{ width: auto; min-width: 76px; }}
@@ -1355,21 +1361,20 @@ def _page(title: str, body: str) -> str:
           th {{ color: var(--rp-muted); font-size: 12px; font-weight: 600; }}
           .empty {{ color: var(--rp-muted); text-align: center; padding: 28px; }}
           @media (max-width: 860px) {{
-            .section, .hero-band {{ padding: 52px 0; }}
+            .section, .hero-band {{ padding: 64px 0; }}
             .hero-band {{ min-height: auto; }}
-            h1 {{ font-size: 36px; }}
-            .lead {{ font-size: 17px; }}
+            h1 {{ font-size: 32px; }}
           }}
           @media (max-width: 560px) {{
             .brand {{ font-size: 14px; }}
             .brand img {{ width: 24px; height: 24px; }}
             .hero-band .btn, .card button {{ width: 100%; }}
             .copy-field {{ display: grid; }}
-            .copy-field .input-group-text {{ min-width: 0; border-radius: .5rem .5rem 0 0; }}
+            .copy-field .input-group-text {{ min-width: 0; border-radius: 12px 12px 0 0; }}
             .copy-field code {{ white-space: normal; overflow-wrap: anywhere; border-radius: 0; }}
             th, td {{ padding: 12px 9px; }}
-            h1 {{ font-size: 31px; }}
-            h2 {{ font-size: 25px; }}
+            h1 {{ font-size: 28px; line-height: 1.15; }}
+            h2 {{ font-size: 24px; }}
           }}
         </style>
       </head>
