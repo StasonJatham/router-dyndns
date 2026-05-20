@@ -22,6 +22,7 @@ class HostnameCredentials(BaseModel):
     username: str
     password: str
     update_url: str
+    credentialed_update_url: str
     management_url: str
 
 
@@ -227,6 +228,7 @@ def _credentials_response(service: DdnsService, account: dict[str, str]) -> Host
         username=account["username"],
         password=account["password"],
         update_url=service.fritz_update_url(account),
+        credentialed_update_url=service.credentialed_update_url(account),
         management_url=service.magic_management_url(account),
     )
 

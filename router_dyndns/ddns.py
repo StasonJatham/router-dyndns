@@ -321,6 +321,10 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
     def index() -> str:
         return _render_public_home(service, settings, None, None)
 
+    @app.get("/magic", include_in_schema=False)
+    def magic_form() -> RedirectResponse:
+        return RedirectResponse("/#create", status_code=303)
+
     @app.post("/magic", response_class=HTMLResponse)
     async def magic_account(request: Request) -> str:
         form = await _request_form(request, settings)
@@ -457,9 +461,10 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
                 notice = _admin_secret_panel(
                     "Router password rotated",
                     [
-                        _copy_row("Domainnamen:", str(rotated["hostname"])),
-                        _copy_row("Benutzername:", str(rotated["username"])),
-                        _copy_row("Kennwort:", str(rotated["password"])),
+                        _copy_row("Domainnamen:", str(rotated["hostname"]), "Public"),
+                        _copy_row("One-box update URL:", service.credentialed_update_url(rotated), "Secret"),
+                        _copy_row("Benutzername:", str(rotated["username"]), "Public"),
+                        _copy_row("Kennwort:", str(rotated["password"]), "Secret"),
                     ],
                 )
         else:
@@ -598,11 +603,11 @@ def _is_admin_path(path: str) -> bool:
 
 def _is_secret_response(request: Request) -> bool:
     path = request.url.path
-    if _is_admin_path(path) or path.startswith(("/m/", "/d/")):
+    if _is_admin_path(path) or path.startswith(("/m/", "/d/", "/u/")):
         return True
     if path.startswith(("/api/v1/hostnames/", "/api/v1/domains/")):
         return request.method in {"POST", "DELETE"}
-    return request.method == "POST" and path in {"/magic", "/request-domain", "/verify-domain", "/accounts"}
+    return (request.method == "POST" and path in {"/magic", "/request-domain", "/verify-domain", "/accounts"}) or path == "/nic/update"
 
 
 def _content_security_policy(path: str) -> str:
@@ -808,6 +813,7 @@ def _credentials_panel(service: DdnsService, created_account: dict[str, str] | N
     username = created_account["username"]
     password = created_account["password"]
     update_url = service.fritz_update_url(created_account)
+    credentialed_update_url = service.credentialed_update_url(created_account)
     management_url = service.magic_management_url(created_account)
     cname_record = f"your-subdomain.example.com. CNAME {hostname}."
     fritzbox_fields = _fritzbox_fields(update_url, hostname, username, password, management_url)
@@ -816,14 +822,16 @@ def _credentials_panel(service: DdnsService, created_account: dict[str, str] | N
       <div class="container">
         <p class="eyebrow">Credentials generated</p>
         <h2>{html.escape(hostname)}</h2>
-        <p class="section-copy">Save this now. The password and private status page are only shown on this screen. To use your own DNS name, create a CNAME from that name to this hostname.</p>
+        <p class="section-copy">Save this now. The password, private status page, and one-box update URL are only shown on this screen. To use your own DNS name, create a CNAME from that name to this hostname.</p>
         {_secret_notice()}
         <div class="d-flex gap-2 flex-wrap my-3">
           {_copy_button("Copy FRITZ!Box fields", fritzbox_fields)}
+          {_copy_button("Copy one-box update URL", credentialed_update_url)}
           {_copy_button("Copy CNAME record", cname_record)}
         </div>
         <div class="d-grid gap-2">
           {_copy_row("Update-URL:", update_url, "Secret")}
+          {_copy_row("One-box update URL:", credentialed_update_url, "Secret")}
           {_copy_row("Domainnamen:", hostname, "Public")}
           {_copy_row("CNAME target:", hostname, "Public")}
           {_copy_row("Benutzername:", username, "Public")}
@@ -896,7 +904,7 @@ def _secret_notice() -> str:
     return """
     <div class="alert alert-info my-3 py-2 small" role="note">
       <strong>Public:</strong> Domainnamen and CNAME target can be shared in DNS.
-      <strong>Secret:</strong> Update-URL, Kennwort, private status page, and domain claim links control the hostname.
+      <strong>Secret:</strong> Update-URL, one-box update URL, Kennwort, private status page, and domain claim links control the hostname.
     </div>
     """
 
@@ -949,7 +957,7 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
               <div class="col-lg-6">
                 <p class="eyebrow">Router settings</p>
                 <h2>FRITZ!Box fields</h2>
-                <p class="section-copy">Use these values in the FRITZ!Box custom DynDNS provider fields. If you use your own DNS name, point it at this hostname with a CNAME.</p>
+                <p class="section-copy">Use the Update-URL directly if your router only has one URL field. The username and password are shown only when generated or rotated. If you use your own DNS name, point it at this hostname with a CNAME.</p>
                 {_secret_notice()}
                 <div class="d-flex gap-2 flex-wrap mt-3">
                   {_copy_button("Copy FRITZ!Box fields", fritzbox_fields)}
@@ -1349,8 +1357,11 @@ def _page(title: str, body: str) -> str:
           .text-primary {{ color: var(--rp-ink) !important; }}
           .text-bg-primary {{ color: #ffffff !important; background-color: #000000 !important; }}
           .alert-info, .alert-warning {{ --bs-alert-color: var(--rp-charcoal); --bs-alert-bg: var(--rp-surface-alt); --bs-alert-border-color: var(--rp-line); }}
+          .copy-field {{ min-width: 0; }}
           .copy-field .input-group-text {{ min-width: 150px; color: var(--rp-muted); font-size: 13px; }}
           .copy-label {{ display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; }}
+          .copy-field .form-control {{ min-width: 0; }}
+          .copy-field code.form-control {{ width: 1%; flex: 1 1 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }}
           .copy-field code {{ min-height: 40px; margin: 0; color: var(--rp-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; line-height: 1.6; background: var(--rp-surface-alt); }}
           .admin-table-scroll {{ max-height: 560px; overflow: auto; }}
           .admin-table-scroll thead th {{ position: sticky; top: 0; z-index: 1; background: var(--rp-surface); }}

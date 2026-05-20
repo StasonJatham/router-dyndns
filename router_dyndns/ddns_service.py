@@ -122,6 +122,17 @@ class DdnsService:
         slug = urllib.parse.quote(account["update_slug"])
         return f"{base}/u/{slug}?myip=<ipaddr>&myipv6=<ip6addr>"
 
+    def credentialed_update_url(self, account: dict[str, str]) -> str:
+        base = self.settings.public_base_url.rstrip("/")
+        hostname = urllib.parse.quote(account["hostname"])
+        username = urllib.parse.quote(account["username"])
+        password = urllib.parse.quote(account["password"])
+        return (
+            f"{base}/nic/update?hostname={hostname}"
+            f"&username={username}&password={password}"
+            "&myip=<ipaddr>&myipv6=<ip6addr>"
+        )
+
     def magic_management_url(self, account: dict[str, str]) -> str:
         base = self.settings.public_base_url.rstrip("/")
         slug = urllib.parse.quote(account["management_slug"])

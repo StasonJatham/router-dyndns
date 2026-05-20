@@ -158,6 +158,8 @@ The generated FRITZ!Box URL uses the native placeholders:
 https://ddns.example.net/u/<random-update-slug>?myip=<ipaddr>&myipv6=<ip6addr>
 ```
 
+This URL is enough for routers that only expose a single update URL field. RouterPulse also shows a `One-box update URL` that embeds `hostname`, `username`, and `password` as query parameters for clients that require credential-style DynDNS URLs but do not expose separate credential fields. Treat both URLs as secrets.
+
 The compatibility endpoint is also available:
 
 ```text

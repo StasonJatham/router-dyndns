@@ -1,6 +1,7 @@
 import re
 import time
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 from fastapi.testclient import TestClient
 
@@ -94,6 +95,57 @@ def test_generated_account_can_update_own_hostname(tmp_path: Path) -> None:
 
     assert slug_response.status_code == 200
     assert slug_response.text == "good 203.0.113.10"
+
+
+def test_generated_credentials_include_one_box_update_url(tmp_path: Path) -> None:
+    database_path = tmp_path / "ddns.sqlite3"
+    app = make_app(
+        DdnsSettings(
+            database_path=database_path,
+            admin_password="admin",
+            public_base_url="http://ddns.example.net",
+            hostname_suffix="ddns.example.net",
+        )
+    )
+    client = TestClient(app)
+
+    response = client.post("/api/v1/hostnames/magic", json={"username": "router"})
+
+    assert response.status_code == 201
+    payload = response.json()
+    one_box_url = payload["credentialed_update_url"]
+    parsed = urlparse(one_box_url)
+    params = parse_qs(parsed.query)
+
+    assert parsed.path == "/nic/update"
+    assert params["hostname"] == [payload["hostname"]]
+    assert params["username"] == [payload["username"]]
+    assert params["password"] == [payload["password"]]
+    assert params["myip"] == ["<ipaddr>"]
+    assert params["myipv6"] == ["<ip6addr>"]
+
+
+def test_one_box_update_url_can_authenticate_with_query_credentials(tmp_path: Path) -> None:
+    database_path = tmp_path / "ddns.sqlite3"
+    store = DdnsStore(database_path)
+    account = store.create_account("home.example.net", "alice")
+    settings = DdnsSettings(
+        database_path=database_path,
+        admin_password="admin",
+        public_base_url="http://ddns.example.net",
+    )
+    app = make_app(settings)
+    client = TestClient(app)
+    one_box_url = ddns_service.DdnsService(settings, store).credentialed_update_url(account)
+    parsed = urlparse(one_box_url)
+    params = parse_qs(parsed.query)
+
+    params["myip"] = ["203.0.113.11"]
+    response = client.get(parsed.path, params={key: value[0] for key, value in params.items()})
+
+    assert response.status_code == 200
+    assert response.text == "good 203.0.113.11"
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_generated_hostname_is_not_an_update_secret(tmp_path: Path) -> None:
@@ -290,6 +342,8 @@ def test_admin_can_rotate_links_and_password(tmp_path: Path) -> None:
     )
     assert password.status_code == 200
     assert "Router password rotated" in password.text
+    assert "One-box update URL:" in password.text
+    assert "/nic/update?" in password.text
     assert "Kennwort:" in password.text
 
 
@@ -308,6 +362,7 @@ def test_self_service_managed_hostname_generates_random_account(tmp_path: Path) 
 
     assert response.status_code == 200
     assert "Update-URL:" in response.text
+    assert "One-box update URL:" in response.text
     assert "CNAME target:" in response.text
     assert "Copy FRITZ!Box fields" in response.text
     assert "Copy CNAME record" in response.text
@@ -315,6 +370,7 @@ def test_self_service_managed_hostname_generates_random_account(tmp_path: Path) 
     assert "Secret:" in response.text
     assert ".ddns.example.net" in response.text
     assert "/u/" in response.text
+    assert "/nic/update?" in response.text
     assert "/m/" in response.text
 
 
@@ -333,6 +389,7 @@ def test_magic_hostname_without_login_generates_update_and_management_links(tmp_
 
     assert response.status_code == 200
     assert "Update-URL:" in response.text
+    assert "One-box update URL:" in response.text
     assert "CNAME target:" in response.text
     assert "Private status page:" in response.text
     assert "Copy FRITZ!Box fields" in response.text
@@ -340,6 +397,16 @@ def test_magic_hostname_without_login_generates_update_and_management_links(tmp_
     assert response.text.count("Secret") >= 3
     assert response.text.count("Public") >= 3
     assert ".ddns.example.net" in response.text
+
+
+def test_magic_get_redirects_to_home_form(tmp_path: Path) -> None:
+    app = make_app(DdnsSettings(database_path=tmp_path / "ddns.sqlite3", admin_password="admin"))
+    client = TestClient(app)
+
+    response = client.get("/magic", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/#create"
 
 
 def test_magic_management_link_can_delete_hostname(tmp_path: Path) -> None:
