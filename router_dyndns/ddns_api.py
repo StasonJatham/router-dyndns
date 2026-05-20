@@ -1,11 +1,10 @@
 import sqlite3
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from .ddns_models import DdnsSettings
-from .ddns_security import verify_session_cookie
 from .ddns_service import DdnsService, normalize_domain
 from .ddns_store import DdnsStore
 
@@ -73,12 +72,6 @@ class RouterUpdateResponse(BaseModel):
 def create_api_router(settings: DdnsSettings, store: DdnsStore, service: DdnsService) -> APIRouter:
     router = APIRouter(prefix="/api/v1")
 
-    def optional_user(request: Request) -> dict[str, str | int] | None:
-        user_id = verify_session_cookie(request.cookies.get("ddns_session"), settings.session_secret)
-        return store.get_user(user_id) if user_id is not None else None
-
-    optional_user_dependency = Depends(optional_user)
-
     @router.post(
         "/hostnames/magic",
         response_model=HostnameCredentials,
@@ -88,7 +81,7 @@ def create_api_router(settings: DdnsSettings, store: DdnsStore, service: DdnsSer
         responses={500: {"model": ErrorResponse}},
     )
     async def create_magic_hostname(payload: MagicHostnameRequest) -> HostnameCredentials:
-        account = await run_in_threadpool(service.create_managed_account, payload.username, None)
+        account = await run_in_threadpool(service.create_managed_account, payload.username)
         return _credentials_response(service, account)
 
     @router.get(
@@ -132,11 +125,10 @@ def create_api_router(settings: DdnsSettings, store: DdnsStore, service: DdnsSer
     )
     async def create_domain_challenge(
         payload: DomainChallengeRequest,
-        user: dict[str, str | int] | None = optional_user_dependency,
     ) -> DomainChallengeResponse:
         domain = normalize_domain(payload.domain)
         try:
-            challenge = await run_in_threadpool(service.create_domain_challenge, domain, int(user["id"]) if user else None)
+            challenge = await run_in_threadpool(service.create_domain_challenge, domain)
         except sqlite3.IntegrityError as exc:
             raise HTTPException(status_code=409, detail="domain is already verified") from exc
         return DomainChallengeResponse(
@@ -155,10 +147,9 @@ def create_api_router(settings: DdnsSettings, store: DdnsStore, service: DdnsSer
     )
     async def verify_domain(
         payload: VerifyDomainRequest,
-        user: dict[str, str | int] | None = optional_user_dependency,
     ) -> VerifyDomainResponse:
         domain = normalize_domain(payload.domain)
-        found, challenge = await run_in_threadpool(service.verify_domain, domain, payload.claim_secret, int(user["id"]) if user else None)
+        found, challenge = await run_in_threadpool(service.verify_domain, domain, payload.claim_secret)
         if not found:
             return VerifyDomainResponse(
                 domain=domain,
@@ -183,14 +174,12 @@ def create_api_router(settings: DdnsSettings, store: DdnsStore, service: DdnsSer
     )
     async def create_custom_hostname(
         payload: CustomHostnameRequest,
-        user: dict[str, str | int] | None = optional_user_dependency,
     ) -> HostnameCredentials:
         account = await run_in_threadpool(
             service.create_custom_account,
             payload.hostname,
             payload.claim_secret,
             payload.username,
-            int(user["id"]) if user else None,
         )
         return _credentials_response(service, account)
 

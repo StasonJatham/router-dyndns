@@ -7,15 +7,6 @@ import router_dyndns.ddns_service as ddns_service
 from router_dyndns.ddns import DdnsSettings, DdnsStore, make_app
 
 
-def login_test_user(client: TestClient) -> None:
-    response = client.post(
-        "/register",
-        data={"email": "alice@example.net", "password": "very-secure-password"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 303
-
-
 def test_update_accepts_fritzbox_placeholders(tmp_path: Path) -> None:
     app = make_app(
         DdnsSettings(
@@ -194,39 +185,6 @@ def test_admin_password_query_string_is_rejected(tmp_path: Path) -> None:
     assert response.status_code == 401
 
 
-def test_registration_is_open_by_default_for_optional_accounts(tmp_path: Path) -> None:
-    app = make_app(DdnsSettings(database_path=tmp_path / "ddns.sqlite3", admin_password="admin"))
-    client = TestClient(app)
-
-    response = client.post(
-        "/register",
-        data={"email": "alice@example.net", "password": "very-secure-password"},
-        follow_redirects=False,
-    )
-
-    assert response.status_code == 303
-
-
-def test_admin_invite_allows_registration(tmp_path: Path) -> None:
-    database_path = tmp_path / "ddns.sqlite3"
-    store = DdnsStore(database_path)
-    invite = store.create_invite()
-    app = make_app(DdnsSettings(database_path=database_path, admin_password="admin"))
-    client = TestClient(app)
-
-    response = client.post(
-        "/register",
-        data={
-            "email": "alice@example.net",
-            "password": "very-secure-password",
-            "invite": invite["code"],
-        },
-        follow_redirects=False,
-    )
-
-    assert response.status_code == 303
-
-
 def test_self_service_managed_hostname_generates_random_account(tmp_path: Path) -> None:
     app = make_app(
         DdnsSettings(
@@ -234,11 +192,9 @@ def test_self_service_managed_hostname_generates_random_account(tmp_path: Path) 
             admin_password="admin",
             hostname_suffix="ddns.example.net",
             public_base_url="http://ddns.example.net",
-            require_invite=False,
         )
     )
     client = TestClient(app)
-    login_test_user(client)
 
     response = client.post("/accounts", data={"mode": "managed", "username": "alice"})
 
@@ -287,9 +243,8 @@ def test_magic_management_link_can_delete_hostname(tmp_path: Path) -> None:
 
 
 def test_custom_hostname_requires_verified_parent_domain(tmp_path: Path) -> None:
-    app = make_app(DdnsSettings(database_path=tmp_path / "ddns.sqlite3", admin_password="admin", require_invite=False))
+    app = make_app(DdnsSettings(database_path=tmp_path / "ddns.sqlite3", admin_password="admin"))
     client = TestClient(app)
-    login_test_user(client)
 
     response = client.post("/accounts", data={"mode": "custom", "hostname": "home.example.net"})
 
@@ -303,14 +258,12 @@ def test_custom_hostname_after_dns_verification(tmp_path: Path, monkeypatch) -> 
             database_path=tmp_path / "ddns.sqlite3",
             admin_password="admin",
             public_base_url="http://ddns.example.net",
-            require_invite=False,
         )
     )
     client = TestClient(app)
-    login_test_user(client)
 
     store = DdnsStore(tmp_path / "ddns.sqlite3")
-    challenge_data = store.create_domain_challenge("example.net", owner_user_id=1)
+    challenge_data = store.create_domain_challenge("example.net")
     verify = client.post(
         "/verify-domain",
         data={"domain": "example.net", "claim_secret": challenge_data["claim_secret"]},
@@ -441,7 +394,6 @@ def test_api_custom_hostname_requires_verified_domain(tmp_path: Path, monkeypatc
     monkeypatch.setattr(ddns_service, "dns_txt_contains", lambda name, expected: True)
     app = make_app(DdnsSettings(database_path=tmp_path / "ddns.sqlite3", admin_password="admin"))
     client = TestClient(app)
-    login_test_user(client)
 
     challenge = client.post("/api/v1/domains/challenges", json={"domain": "example.net"})
     assert challenge.status_code == 201
@@ -527,7 +479,6 @@ def test_verified_domain_challenge_cannot_be_overwritten(tmp_path: Path, monkeyp
     monkeypatch.setattr(ddns_service, "dns_txt_contains", lambda name, expected: True)
     app = make_app(DdnsSettings(database_path=tmp_path / "ddns.sqlite3", admin_password="admin"))
     client = TestClient(app)
-    login_test_user(client)
 
     challenge = client.post("/api/v1/domains/challenges", json={"domain": "example.net"}).json()
     verified = client.post(
@@ -538,25 +489,6 @@ def test_verified_domain_challenge_cannot_be_overwritten(tmp_path: Path, monkeyp
 
     assert verified.status_code == 200
     assert overwrite.status_code == 409
-
-
-def test_logged_in_hostname_quota_is_enforced(tmp_path: Path) -> None:
-    app = make_app(
-        DdnsSettings(
-            database_path=tmp_path / "ddns.sqlite3",
-            admin_password="admin",
-            hostname_suffix="ddns.example.net",
-            max_hostnames_per_user=1,
-        )
-    )
-    client = TestClient(app)
-    login_test_user(client)
-
-    first = client.post("/accounts", data={"mode": "managed", "username": "one"})
-    second = client.post("/accounts", data={"mode": "managed", "username": "two"})
-
-    assert first.status_code == 200
-    assert second.status_code == 403
 
 
 def test_custom_hostname_must_be_inside_publishable_dns_zone(tmp_path: Path, monkeypatch) -> None:
@@ -572,7 +504,6 @@ def test_custom_hostname_must_be_inside_publishable_dns_zone(tmp_path: Path, mon
         )
     )
     client = TestClient(app)
-    login_test_user(client)
 
     challenge = client.post("/api/v1/domains/challenges", json={"domain": "example.net"}).json()
     client.post(

@@ -15,9 +15,6 @@ class DdnsSettings(BaseModel):
     public_base_url: str = Field(default="http://localhost:8080")
     hostname_suffix: str = Field(default="")
     verification_prefix: str = Field(default="_router_dyndns-ddns")
-    session_secret: str = Field(default="")
-    require_invite: bool = Field(default=False)
-    max_hostnames_per_user: int = Field(default=5, ge=1, le=100)
     rate_limit_per_minute: int = Field(default=60, ge=1, le=10_000)
     trusted_proxy_ips: set[str] = Field(default_factory=set)
     rfc2136_server: str | None = None
@@ -56,9 +53,6 @@ class DdnsSettings(BaseModel):
             public_base_url=os.getenv("DDNS_PUBLIC_BASE_URL", "http://localhost:8080"),
             hostname_suffix=os.getenv("DDNS_HOSTNAME_SUFFIX", ""),
             verification_prefix=os.getenv("DDNS_VERIFICATION_PREFIX", "_router_dyndns-ddns"),
-            session_secret=os.getenv("DDNS_SESSION_SECRET", os.getenv("DDNS_ADMIN_PASSWORD", "")),
-            require_invite=os.getenv("DDNS_REQUIRE_INVITE", "0").strip().lower() not in {"0", "false", "no"},
-            max_hostnames_per_user=_env_int("DDNS_MAX_HOSTNAMES_PER_USER", 5),
             rate_limit_per_minute=_env_int("DDNS_RATE_LIMIT_PER_MINUTE", 60),
             trusted_proxy_ips=trusted_proxy_ips,
             rfc2136_server=os.getenv("DDNS_RFC2136_SERVER") or None,

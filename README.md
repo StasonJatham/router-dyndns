@@ -59,7 +59,7 @@ That means users always have a current hostname for VPN, remote access, self-hos
 | Custom domains | TXT challenge verification before hostname creation |
 | Persistence | SQLite with WAL mode |
 | API | FastAPI, OpenAPI, Swagger UI, ReDoc |
-| Auth model | Private magic links for hostnames and custom-domain claims; optional account workspace for dashboards |
+| Auth model | No user accounts. Private bearer links for hostnames and custom-domain claims |
 | Operations | Rate limiting, update logs, cleanup jobs, Docker, Caddy example |
 
 ## Quick Start

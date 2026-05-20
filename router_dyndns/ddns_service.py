@@ -29,18 +29,12 @@ class DdnsService:
         self._locks_guard = threading.Lock()
         self._locks: dict[str, threading.Lock] = {}
 
-    def create_managed_account(self, username: str | None = None, owner_user_id: int | None = None) -> dict[str, str]:
+    def create_managed_account(self, username: str | None = None) -> dict[str, str]:
         if not self.settings.hostname_suffix:
             raise HTTPException(status_code=500, detail="DDNS_HOSTNAME_SUFFIX is required")
-        if owner_user_id is not None:
-            self._enforce_account_quota(owner_user_id)
         for _ in range(5):
             try:
-                return self.store.create_account(
-                    self.random_managed_hostname(),
-                    username,
-                    owner_user_id=owner_user_id,
-                )
+                return self.store.create_account(self.random_managed_hostname(), username)
             except sqlite3.IntegrityError:
                 continue
         raise HTTPException(status_code=500, detail="could not allocate hostname")
@@ -50,36 +44,33 @@ class DdnsService:
         hostname: str,
         claim_secret: str,
         username: str | None = None,
-        owner_user_id: int | None = None,
     ) -> dict[str, str]:
         normalized = normalize_hostname(hostname, self.settings, expand_suffix=False)
         if not normalized:
             raise HTTPException(status_code=400, detail="valid custom hostname is required")
         if not self.hostname_is_publishable(normalized):
             raise HTTPException(status_code=403, detail="hostname is outside configured DNS publishing zones")
-        if not self.best_verified_parent(normalized, owner_user_id, claim_secret):
+        if not self.best_verified_parent(normalized, claim_secret):
             raise HTTPException(status_code=403, detail="verify the parent domain before creating this hostname")
-        if owner_user_id is not None:
-            self._enforce_account_quota(owner_user_id)
         try:
-            return self.store.create_account(normalized, username, owner_user_id=owner_user_id)
+            return self.store.create_account(normalized, username)
         except sqlite3.IntegrityError as exc:
             raise HTTPException(status_code=409, detail="hostname already exists") from exc
 
-    def create_domain_challenge(self, domain: str, owner_user_id: int | None = None) -> dict[str, str]:
+    def create_domain_challenge(self, domain: str) -> dict[str, str]:
         normalized = normalize_domain(domain)
         if not normalized:
             raise HTTPException(status_code=400, detail="valid domain is required")
-        existing = self.store.get_domain_challenge(normalized, owner_user_id=owner_user_id)
+        existing = self.store.get_domain_challenge(normalized)
         if existing and existing.get("verified_at"):
             raise HTTPException(status_code=409, detail="domain is already verified")
-        return self.store.create_domain_challenge(normalized, owner_user_id)
+        return self.store.create_domain_challenge(normalized)
 
-    def verify_domain(self, domain: str, claim_secret: str, owner_user_id: int | None = None) -> tuple[bool, dict[str, str | None]]:
+    def verify_domain(self, domain: str, claim_secret: str) -> tuple[bool, dict[str, str | None]]:
         normalized = normalize_domain(domain)
         if not normalized:
             raise HTTPException(status_code=400, detail="valid domain is required")
-        challenge = self.store.get_domain_challenge(normalized, owner_user_id=owner_user_id, claim_secret=claim_secret)
+        challenge = self.store.get_domain_challenge(normalized, claim_secret=claim_secret)
         if not challenge:
             raise HTTPException(status_code=404, detail="domain challenge not found")
         found = dns_txt_contains(self.verification_name(normalized), str(challenge["token"]))
@@ -87,7 +78,7 @@ class DdnsService:
             challenge = dict(challenge)
             challenge["claim_secret"] = claim_secret
             return False, challenge
-        verified = self.store.verify_domain_challenge(normalized, owner_user_id=owner_user_id)
+        verified = self.store.verify_domain_challenge(normalized)
         if verified is None:
             raise HTTPException(status_code=404, detail="domain challenge not found")
         verified = dict(verified)
@@ -147,18 +138,13 @@ class DdnsService:
             raise HTTPException(status_code=500, detail="DDNS_HOSTNAME_SUFFIX is required for managed hostnames")
         return f"{secrets.token_hex(6)}.{suffix}"
 
-    def best_verified_parent(
-        self,
-        hostname: str,
-        owner_user_id: int | None = None,
-        claim_secret: str | None = None,
-    ) -> str | None:
+    def best_verified_parent(self, hostname: str, claim_secret: str | None = None) -> str | None:
         labels = hostname.split(".")
         for index in range(1, len(labels) - 1):
             candidate = ".".join(labels[index:])
-            if self.store.is_domain_verified(candidate, owner_user_id, claim_secret):
+            if self.store.is_domain_verified(candidate, claim_secret):
                 return candidate
-        if self.store.is_domain_verified(hostname, owner_user_id, claim_secret):
+        if self.store.is_domain_verified(hostname, claim_secret):
             return hostname
         return None
 
@@ -179,10 +165,6 @@ class DdnsService:
         if not zones and self.settings.hostname_suffix:
             zones.add(self.settings.hostname_suffix.strip().lower().strip("."))
         return bool(zones) and any(hostname == zone or hostname.endswith(f".{zone}") for zone in zones)
-
-    def _enforce_account_quota(self, owner_user_id: int) -> None:
-        if self.store.count_user_accounts(owner_user_id) >= self.settings.max_hostnames_per_user:
-            raise HTTPException(status_code=403, detail="hostname quota exceeded")
 
     def _lock_for(self, hostname: str) -> threading.Lock:
         with self._locks_guard:

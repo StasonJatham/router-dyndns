@@ -19,10 +19,7 @@ from .ddns_security import (
     client_ip,
     credentials_from_basic_auth,
     is_rate_limited_path,
-    normalize_email,
     require_admin_csrf,
-    set_session_cookie,
-    verify_session_cookie,
 )
 from .ddns_service import DdnsService, normalize_domain, normalize_hostname
 from .ddns_store import DdnsStore
@@ -67,8 +64,6 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
     settings = settings or DdnsSettings.from_env()
     if not settings.admin_password and settings.shared_secret:
         settings = settings.model_copy(update={"admin_password": settings.shared_secret})
-    if not settings.session_secret:
-        settings = settings.model_copy(update={"session_secret": settings.admin_password or settings.shared_secret})
     if settings.require_dns_provider and not dns_backend_configured(settings):
         raise RuntimeError("DDNS_REQUIRE_DNS_PROVIDER is set but no DNS backend is configured")
 
@@ -139,10 +134,6 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
                 headers={"WWW-Authenticate": 'Basic realm="router_dyndns-ddns"'},
             )
 
-    def current_user(request: Request) -> dict[str, str | int] | None:
-        user_id = verify_session_cookie(request.cookies.get("ddns_session"), settings.session_secret)
-        return store.get_user(user_id) if user_id is not None else None
-
     def apply_update(
         request: Request,
         hostname: str,
@@ -157,21 +148,14 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
             return PlainTextResponse("911 dns publish failed", status_code=500)
 
     @app.get("/", response_class=HTMLResponse)
-    def index(request: Request) -> str:
-        user = current_user(request)
-        if user:
-            return _render_user_home(service, settings, user, store.list_accounts(int(user["id"])), None, None, None)
+    def index() -> str:
         return _render_public_home(service, settings, None, None)
-
-    @app.get("/login", response_class=HTMLResponse)
-    def login_page() -> str:
-        return _render_auth_page(settings, None)
 
     @app.post("/magic", response_class=HTMLResponse)
     async def magic_account(request: Request) -> str:
         form = _parse_form(await request.body())
         username = _first_form_value(form, "username") or None
-        account = await run_in_threadpool(service.create_managed_account, username, None)
+        account = await run_in_threadpool(service.create_managed_account, username)
         return _render_public_home(service, settings, account, None)
 
     @app.get("/m/{management_slug}", response_class=HTMLResponse)
@@ -218,53 +202,34 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
 
     @app.post("/request-domain", response_class=HTMLResponse)
     async def request_domain(request: Request) -> str:
-        user = await run_in_threadpool(current_user, request)
         form = _parse_form(await request.body())
         try:
             challenge = await run_in_threadpool(
                 service.create_domain_challenge,
                 _first_form_value(form, "domain"),
-                int(user["id"]) if user else None,
             )
         except sqlite3.IntegrityError as exc:
             raise HTTPException(status_code=409, detail="domain is already verified") from exc
-        if user:
-            return _render_user_home(service, settings, user, store.list_accounts(int(user["id"])), None, None, challenge)
         return _render_public_home(service, settings, None, None, challenge)
 
     @app.post("/verify-domain", response_class=HTMLResponse)
     async def verify_domain(request: Request) -> str:
-        user = await run_in_threadpool(current_user, request)
         form = _parse_form(await request.body())
         domain = normalize_domain(_first_form_value(form, "domain"))
         claim_secret = _first_form_value(form, "claim_secret")
-        owner_user_id = int(user["id"]) if user else None
-        found, challenge = await run_in_threadpool(service.verify_domain, domain, claim_secret, owner_user_id)
+        found, challenge = await run_in_threadpool(service.verify_domain, domain, claim_secret)
         if not found:
             message = "TXT record not found yet. DNS propagation can take a few minutes."
-            if not user:
-                return _render_public_home(service, settings, None, message, challenge)
-            return _render_user_home(
-                service,
-                settings,
-                user,
-                store.list_accounts(int(user["id"])),
-                None,
-                message,
-                challenge,
-            )
-        if not user:
-            return _render_public_home(service, settings, None, "Domain verified. You can now create a hostname under it.", challenge)
-        return _render_user_home(service, settings, user, store.list_accounts(int(user["id"])), None, "Domain verified. You can now create a hostname under it.", challenge)
+            return _render_public_home(service, settings, None, message, challenge)
+        return _render_public_home(service, settings, None, "Domain verified. You can now create a hostname under it.", challenge)
 
     @app.post("/accounts", response_class=HTMLResponse)
     async def self_service_account(request: Request) -> str:
-        user = await run_in_threadpool(current_user, request)
         form = _parse_form(await request.body())
         mode = _first_form_value(form, "mode")
         username = _first_form_value(form, "username") or None
         if mode == "managed":
-            account = await run_in_threadpool(service.create_managed_account, username, int(user["id"]) if user else None)
+            account = await run_in_threadpool(service.create_managed_account, username)
         else:
             claim_secret = _first_form_value(form, "claim_secret")
             account = await run_in_threadpool(
@@ -272,50 +237,12 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
                 _first_form_value(form, "hostname"),
                 claim_secret,
                 username,
-                int(user["id"]) if user else None,
             )
-        if not user:
-            return _render_public_home(service, settings, account, None)
-        return _render_user_home(service, settings, user, store.list_accounts(int(user["id"])), account, None, None)
-
-    @app.post("/register")
-    async def register(request: Request) -> Response:
-        form = _parse_form(await request.body())
-        email = normalize_email(_first_form_value(form, "email"))
-        password = _first_form_value(form, "password")
-        invite = _first_form_value(form, "invite")
-        if not email or len(password) < 12:
-            return HTMLResponse(_render_auth_page(settings, "Use a valid email and a password with at least 12 characters."))
-        try:
-            user = await run_in_threadpool(store.create_user, email, password, invite, settings.require_invite)
-        except (sqlite3.IntegrityError, ValueError):
-            return HTMLResponse(
-                _render_auth_page(settings, "Registration failed. Check the invite code and email address."),
-                status_code=400,
-            )
-        response = RedirectResponse("/", status_code=303)
-        set_session_cookie(response, settings, int(user["id"]))
-        return response
-
-    @app.post("/login")
-    async def login(request: Request) -> Response:
-        form = _parse_form(await request.body())
-        user = await run_in_threadpool(store.authenticate_user, normalize_email(_first_form_value(form, "email")), _first_form_value(form, "password"))
-        if not user:
-            return HTMLResponse(_render_auth_page(settings, "Login failed."), status_code=401)
-        response = RedirectResponse("/", status_code=303)
-        set_session_cookie(response, settings, int(user["id"]))
-        return response
-
-    @app.post("/logout")
-    def logout() -> Response:
-        response = RedirectResponse("/", status_code=303)
-        response.delete_cookie("ddns_session")
-        return response
+        return _render_public_home(service, settings, account, None)
 
     @app.get("/admin", response_class=HTMLResponse)
     def admin(_: None = Depends(authenticate_admin)) -> str:
-        return _render_admin_page(service, settings, store.list_accounts(), store.list_invites(), None)
+        return _render_admin_page(service, settings, store.list_accounts(), None)
 
     @app.post("/admin/accounts")
     async def admin_create_account(request: Request, _: None = Depends(authenticate_admin)) -> Response:
@@ -331,7 +258,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
             account = store.create_account(hostname, username)
         except sqlite3.IntegrityError as exc:
             raise HTTPException(status_code=409, detail="hostname already exists") from exc
-        return HTMLResponse(_render_admin_page(service, settings, store.list_accounts(), store.list_invites(), account))
+        return HTMLResponse(_render_admin_page(service, settings, store.list_accounts(), account))
 
     @app.post("/admin/accounts/delete")
     async def admin_delete_account(request: Request, _: None = Depends(authenticate_admin)) -> Response:
@@ -343,13 +270,6 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
                 service.delete_account(hostname, "admin")
             except Exception:
                 return PlainTextResponse("DNS delete failed; hostname was not deleted", status_code=500)
-        return RedirectResponse("/admin", status_code=303)
-
-    @app.post("/admin/invites")
-    async def create_invite(request: Request, _: None = Depends(authenticate_admin)) -> Response:
-        form = _parse_form(await request.body())
-        require_admin_csrf(settings, _first_form_value(form, "csrf"))
-        store.create_invite()
         return RedirectResponse("/admin", status_code=303)
 
     @app.get("/records")
@@ -423,16 +343,6 @@ def _first_form_value(form: dict[str, list[str]], key: str) -> str:
     return form.get(key, [""])[0].strip()
 
 
-def _render_magic_page(
-    service: DdnsService,
-    settings: DdnsSettings,
-    created_account: dict[str, str] | None,
-    message: str | None,
-    challenge: dict[str, str | None] | None = None,
-) -> str:
-    return _render_public_home(service, settings, created_account, message, challenge)
-
-
 def _render_public_home(
     service: DdnsService,
     settings: DdnsSettings,
@@ -490,138 +400,11 @@ def _render_public_home(
     )
 
 
-def _render_user_home(
-    service: DdnsService,
-    settings: DdnsSettings,
-    user: dict[str, str | int],
-    accounts: list[dict[str, str | int | None]],
-    created_account: dict[str, str] | None,
-    message: str | None,
-    challenge: dict[str, str | None] | None = None,
-) -> str:
-    created_html = _credentials_panel(service, created_account)
-    message_html = _message_band(message) if message and not challenge else ""
-    account_rows = "\n".join(_account_row(account, show_owner=False) for account in accounts) or """
-      <tr><td colspan="6" class="empty">No hostnames yet.</td></tr>
-    """
-    return _page(
-        "router-dyndns dashboard",
-        f"""
-        <main>
-          {_top_nav(str(user["email"]), True)}
-          <section class="section">
-            <div class="container page-heading">
-              <p class="eyebrow">Dashboard</p>
-              <h1>Your router hostnames</h1>
-              <p class="lead">Create provider hostnames immediately, or add a domain and verify it with a DNS TXT record.</p>
-            </div>
-          </section>
-          {message_html}
-          {created_html}
-          <section class="section">
-            <div class="container tool-grid">
-              <div>
-                <p class="eyebrow">Provider hostname</p>
-                <h2>Create a random hostname</h2>
-                <p class="section-copy">Best for simple FRITZ!Box setups. The hostname and update link are generated for you.</p>
-              </div>
-              <form method="post" action="/accounts" class="tool-card">
-                <input type="hidden" name="mode" value="managed">
-                <label>Username
-                  <input name="username" placeholder="optional">
-                </label>
-                <button type="submit">Create hostname</button>
-              </form>
-            </div>
-          </section>
-          {_custom_domain_flow(service, challenge, message)}
-          <section class="section">
-            <div class="container">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Inventory</p>
-                  <h2>Hostnames</h2>
-                </div>
-              </div>
-              <div class="table-wrap">
-                <table>
-                  <thead><tr><th>Domain</th><th>User</th><th>IPv4</th><th>IPv6</th><th>Updated</th><th></th></tr></thead>
-                  <tbody>{account_rows}</tbody>
-                </table>
-              </div>
-            </div>
-          </section>
-        </main>
-        """,
-    )
-
-
-def _render_auth_page(settings: DdnsSettings, message: str | None) -> str:
-    invite_field = """
-      <label>Invite code
-        <input name="invite" autocomplete="off" required>
-      </label>
-    """ if settings.require_invite else ""
-    return _page(
-        "Sign in",
-        f"""
-        <main>
-          {_top_nav()}
-          <section class="hero-band compact">
-            <div class="container hero-inner">
-              <p class="eyebrow">Custom domains</p>
-              <h1>Optional account workspace.</h1>
-              <p class="lead">Most users do not need this. Magic links handle normal hostname and domain setup; accounts are only for people who want a persistent dashboard.</p>
-            </div>
-          </section>
-          {_message_band(message) if message else ""}
-          <section class="section">
-            <div class="container auth-grid">
-              <div class="tool-card">
-                <h2>Login</h2>
-                <form method="post" action="/login" class="stack-form">
-                  <label>Email<input name="email" type="email" autocomplete="email" required></label>
-                  <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
-                  <button type="submit">Login</button>
-                </form>
-              </div>
-              <div class="tool-card secondary-card">
-                <h2>Register</h2>
-                <form method="post" action="/register" class="stack-form">
-                  <label>Email<input name="email" type="email" autocomplete="email" required></label>
-                  <label>Password<input name="password" type="password" autocomplete="new-password" minlength="12" required></label>
-                  {invite_field}
-                  <button type="submit">Create account</button>
-                </form>
-              </div>
-            </div>
-          </section>
-        </main>
-        """,
-    )
-
-
-def _render_public_page(
-    service: DdnsService,
-    settings: DdnsSettings,
-    user: dict[str, str | int] | None,
-    accounts: list[dict[str, str | int | None]],
-    challenge: dict[str, str | None] | None,
-    message: str | None,
-    created_account: dict[str, str] | None = None,
-) -> str:
-    if user:
-        return _render_user_home(service, settings, user, accounts, created_account, message, challenge)
-    return _render_public_home(service, settings, created_account, message, challenge)
-
-
-def _top_nav(label: str | None = None, show_logout: bool = False, links: str = "") -> str:
+def _top_nav(label: str | None = None, links: str = "") -> str:
     account_html = ""
     if label:
         account_html = f'<span class="nav-label">{html.escape(label)}</span>'
-    if show_logout:
-        account_html += '<form method="post" action="/logout"><button class="nav-button" type="submit">Logout</button></form>'
-    elif not links:
+    if not links:
         account_html += '<a class="nav-button" href="/#custom-domain">Domain setup</a>'
     return f"""
     <nav class="top-nav">
@@ -715,10 +498,6 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
       </div>
     </section>
     """
-
-
-def _challenge_panel(service: DdnsService, challenge: dict[str, str | None] | None, message: str | None) -> str:
-    return _custom_domain_flow(service, challenge, message)
 
 
 def _credentials_panel(service: DdnsService, created_account: dict[str, str] | None) -> str:
@@ -851,15 +630,11 @@ def _render_admin_page(
     service: DdnsService,
     settings: DdnsSettings,
     accounts: list[dict[str, str | int | None]],
-    invites: list[dict[str, str | None]],
     created_account: dict[str, str] | None,
 ) -> str:
     csrf = html.escape(admin_csrf_token(settings))
-    rows = "\n".join(_account_row(account, show_owner=True, csrf=csrf) for account in accounts) or """
-      <tr><td colspan="7" class="empty">No accounts yet.</td></tr>
-    """
-    invite_rows = "\n".join(_invite_row(invite) for invite in invites) or """
-      <tr><td colspan="3" class="empty">No invites yet.</td></tr>
+    rows = "\n".join(_account_row(account, csrf=csrf) for account in accounts) or """
+      <tr><td colspan="6" class="empty">No accounts yet.</td></tr>
     """
     suffix_help = (
         f"Short names are expanded under {html.escape(settings.hostname_suffix)}."
@@ -870,7 +645,7 @@ def _render_admin_page(
         "DynDNS Admin",
         f"""
         <main>
-          {_top_nav("Operator console", False, '<a href="/records">Records</a><a href="/events">Events</a>')}
+          {_top_nav("Operator console", '<a href="/records">Records</a><a href="/events">Events</a>')}
           <section class="section admin-heading">
             <div class="container">
               <p class="eyebrow">DynDNS aktiv</p>
@@ -906,27 +681,6 @@ def _render_admin_page(
             <div class="container">
               <div class="section-heading">
                 <div>
-                  <p class="eyebrow">Invites</p>
-                  <h2>Registration codes</h2>
-                </div>
-                <form method="post" action="/admin/invites">
-                  <input type="hidden" name="csrf" value="{csrf}">
-                  <button type="submit">Create invite</button>
-                </form>
-              </div>
-              <div class="table-wrap">
-                <table>
-                  <thead><tr><th>Code</th><th>Created</th><th>Used</th></tr></thead>
-                  <tbody>{invite_rows}</tbody>
-                </table>
-              </div>
-            </div>
-          </section>
-
-          <section class="section">
-            <div class="container">
-              <div class="section-heading">
-                <div>
                   <p class="eyebrow">Accounts</p>
                   <h2>Active credentials</h2>
                 </div>
@@ -934,7 +688,7 @@ def _render_admin_page(
               <div class="table-wrap">
                 <table>
                   <thead>
-                    <tr><th>Domain</th><th>User</th><th>Owner</th><th>IPv4</th><th>IPv6</th><th>Updated</th><th></th></tr>
+                    <tr><th>Domain</th><th>User</th><th>IPv4</th><th>IPv6</th><th>Updated</th><th></th></tr>
                   </thead>
                   <tbody>{rows}</tbody>
                 </table>
@@ -946,16 +700,15 @@ def _render_admin_page(
     )
 
 
-def _account_row(account: dict[str, str | int | None], show_owner: bool, csrf: str = "") -> str:
+def _account_row(account: dict[str, str | int | None], csrf: str = "") -> str:
     hostname = html.escape(str(account["hostname"]))
     username = html.escape(str(account["username"]))
     ipv4 = html.escape(str(account.get("ipv4") or "-"))
     ipv6 = html.escape(str(account.get("ipv6") or "-"))
     updated = html.escape(str(account.get("updated_at") or "Never"))
-    owner = f"<td>{html.escape(str(account.get('owner_user_id') or '-'))}</td>" if show_owner else ""
     return f"""
       <tr>
-        <td>{hostname}</td><td>{username}</td>{owner}<td>{ipv4}</td><td>{ipv6}</td><td>{updated}</td>
+        <td>{hostname}</td><td>{username}</td><td>{ipv4}</td><td>{ipv6}</td><td>{updated}</td>
         <td>
           <form method="post" action="/admin/accounts/delete">
             <input type="hidden" name="csrf" value="{html.escape(csrf)}">
@@ -965,13 +718,6 @@ def _account_row(account: dict[str, str | int | None], show_owner: bool, csrf: s
         </td>
       </tr>
     """
-
-
-def _invite_row(invite: dict[str, str | None]) -> str:
-    code = html.escape(str(invite["code"]))
-    created = html.escape(str(invite.get("created_at") or "-"))
-    used = html.escape(str(invite.get("used_at") or "-"))
-    return f"<tr><td><input readonly value=\"{code}\"></td><td>{created}</td><td>{used}</td></tr>"
 
 
 def _page(title: str, body: str) -> str:
