@@ -664,21 +664,40 @@ def _render_public_home(
           {created_html}
           <section class="section" id="create">
             <div class="container narrow">
-              <div class="row g-4 align-items-center">
-              <div class="col-lg-6">
-                <p class="eyebrow">Create in one step</p>
+              <div class="text-center mb-4">
+                <p class="eyebrow">Choose your hostname</p>
                 <h2>No account. No login.</h2>
-                <p class="section-copy">The generated URL is the secret. FRITZ!Box replaces <code>&lt;ipaddr&gt;</code> and calls it when your public IP changes.</p>
-                <div class="terminal-card mt-4" aria-hidden="true">
-                  <div class="terminal-dots"><span></span><span></span><span></span></div>
-                  <code>$ curl -sS 'https://karldns.de/u/&lt;secret&gt;?myip=203.0.113.10'</code>
-                  <code>good 203.0.113.10</code>
+                <p class="section-copy mx-auto">Use a generated KarlDNS hostname immediately, or verify your own domain with a DNS TXT record.</p>
+              </div>
+              <div class="row g-4 align-items-stretch">
+                <div class="col-lg-6">
+                  <div class="card card-body h-100 gap-3">
+                    <p class="eyebrow">Use our domain</p>
+                    <h3>Generate a KarlDNS hostname</h3>
+                    <p class="section-copy mb-0">KarlDNS generates the hostname, secret update URL, and optional router compatibility credentials automatically.</p>
+                    <form method="post" action="/magic" class="d-grid gap-3" aria-label="Create a generated DynDNS hostname">
+                      <button type="submit" class="btn btn-primary rounded-pill">Generate hostname</button>
+                    </form>
+                  </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="card card-body h-100 gap-3">
+                    <p class="eyebrow">Use your own domain</p>
+                    <h3>Verify DNS ownership</h3>
+                    <p class="section-copy mb-0">Add one TXT record so KarlDNS can confirm you control the domain before it publishes A/AAAA records there.</p>
+                    <form method="post" action="/request-domain" class="d-grid gap-3" aria-label="Request a custom domain TXT challenge">
+                      <label>Domain
+                        <input class="form-control" name="domain" placeholder="example.com" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+                      </label>
+                      <button type="submit" class="btn btn-primary rounded-pill">Create TXT challenge</button>
+                    </form>
+                  </div>
                 </div>
               </div>
-              <form method="post" action="/magic" class="col-lg-5 card card-body gap-3" aria-label="Create a generated DynDNS hostname">
-                <p class="section-copy mb-0">KarlDNS generates the hostname, secret update URL, and optional router compatibility credentials automatically.</p>
-                <button type="submit" class="btn btn-primary rounded-pill">Generate hostname</button>
-              </form>
+              <div class="terminal-card mt-4" aria-hidden="true">
+                <div class="terminal-dots"><span></span><span></span><span></span></div>
+                <code>$ curl -sS 'https://karldns.de/u/&lt;secret&gt;?myip=203.0.113.10'</code>
+                <code>good 203.0.113.10</code>
               </div>
             </div>
           </section>
@@ -729,20 +748,21 @@ def _top_nav(label: str | None = None, links: str = "") -> str:
 
 
 def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] | None, message: str | None) -> str:
+    if not challenge:
+        return ""
     challenge_html = ""
     create_form = ""
-    if challenge:
-        domain = html.escape(str(challenge["domain"]))
-        token = str(challenge["token"])
-        claim_secret = html.escape(str(challenge.get("claim_secret") or ""))
-        verification_name = service.verification_name(str(challenge["domain"]))
-        claim_url = service.domain_claim_url(challenge)
-        status = html.escape(message or "Add this TXT record at your DNS provider, then check when it has propagated.")
-        txt_bundle = f"TXT name: {verification_name}\nTXT value: {token}"
-        challenge_html = f"""
-        <div class="col-md-4">
+    domain = html.escape(str(challenge["domain"]))
+    token = str(challenge["token"])
+    claim_secret = html.escape(str(challenge.get("claim_secret") or ""))
+    verification_name = service.verification_name(str(challenge["domain"]))
+    claim_url = service.domain_claim_url(challenge)
+    status = html.escape(message or "Add this TXT record at your DNS provider, then check when it has propagated.")
+    txt_bundle = f"TXT name: {verification_name}\nTXT value: {token}"
+    challenge_html = f"""
+        <div class="col-lg-5">
         <div class="card card-body h-100 gap-3">
-          <span class="badge text-bg-primary rounded-circle align-self-start">2</span>
+          <span class="badge text-bg-primary rounded-circle align-self-start">1</span>
           <h3>Add the TXT record</h3>
           <p class="small text-secondary mb-0 mt-2">{status}</p>
           <div class="alert alert-info mb-0 py-2 small">TXT name and value are public DNS records. The private claim link is secret.</div>
@@ -758,11 +778,11 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
         </div>
         </div>
         """
-        if challenge.get("verified_at"):
-            create_form = f"""
-            <div class="col-md-4">
+    if challenge.get("verified_at"):
+        create_form = f"""
+            <div class="col-lg-5">
             <div class="card card-body h-100 gap-3">
-              <span class="badge text-bg-primary rounded-circle align-self-start">3</span>
+              <span class="badge text-bg-primary rounded-circle align-self-start">2</span>
               <h3>Create router hostname</h3>
               <form method="post" action="/accounts" class="d-grid gap-3" aria-label="Create custom-domain router credentials">
                 <input type="hidden" name="mode" value="custom">
@@ -776,11 +796,11 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
             </div>
             </div>
             """
-        else:
-            create_form = """
-            <div class="col-md-4">
+    else:
+        create_form = """
+            <div class="col-lg-5">
             <div class="card card-body h-100 gap-3 opacity-75">
-              <span class="badge text-bg-primary rounded-circle align-self-start">3</span>
+              <span class="badge text-bg-primary rounded-circle align-self-start">2</span>
               <h3>Create router hostname</h3>
               <p class="small text-secondary mb-0 mt-2">This unlocks after the TXT record is visible in public DNS.</p>
             </div>
@@ -789,27 +809,13 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
 
     return f"""
     <section class="section" id="custom-domain">
-      <div class="container">
-        <div class="d-flex align-items-md-center justify-content-between gap-4 flex-column flex-md-row">
-          <div>
-            <p class="eyebrow">Direct custom-domain publishing</p>
-            <h2>Verify DNS ownership</h2>
-            <p class="section-copy">Use this only when KarlDNS should publish A/AAAA records directly inside your domain. If you just want your own subdomain, generate a hostname above and create a CNAME to it.</p>
-          </div>
+      <div class="container narrow">
+        <div class="text-center">
+          <p class="eyebrow">Direct custom-domain publishing</p>
+          <h2>Verify DNS ownership</h2>
+          <p class="section-copy mx-auto">Use this only when KarlDNS should publish A/AAAA records directly inside your domain. If you just want your own subdomain, generate a hostname above and create a CNAME to it.</p>
         </div>
-        <div class="row g-3 mt-4">
-          <div class="col-md-4">
-          <div class="card card-body h-100 gap-3">
-            <span class="badge text-bg-primary rounded-circle align-self-start">1</span>
-            <h3>Enter domain</h3>
-            <form method="post" action="/request-domain" class="d-grid gap-3" aria-label="Request a custom domain TXT challenge">
-              <label>Domain
-                <input class="form-control" name="domain" placeholder="example.com" autocomplete="off" autocapitalize="none" spellcheck="false" required>
-              </label>
-              <button type="submit" class="btn btn-primary rounded-pill">Create TXT challenge</button>
-            </form>
-          </div>
-          </div>
+        <div class="row g-3 mt-4 justify-content-center">
           {challenge_html}
           {create_form}
         </div>
