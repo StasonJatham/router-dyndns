@@ -77,13 +77,7 @@ def create_api_router(settings: DdnsSettings, store: DdnsStore, service: DdnsSer
         user_id = verify_session_cookie(request.cookies.get("ddns_session"), settings.session_secret)
         return store.get_user(user_id) if user_id is not None else None
 
-    def require_user(request: Request) -> dict[str, str | int]:
-        user = optional_user(request)
-        if not user:
-            raise HTTPException(status_code=401, detail="authentication required")
-        return user
-
-    user_dependency = Depends(require_user)
+    optional_user_dependency = Depends(optional_user)
 
     @router.post(
         "/hostnames/magic",
@@ -138,11 +132,11 @@ def create_api_router(settings: DdnsSettings, store: DdnsStore, service: DdnsSer
     )
     async def create_domain_challenge(
         payload: DomainChallengeRequest,
-        user: dict[str, str | int] = user_dependency,
+        user: dict[str, str | int] | None = optional_user_dependency,
     ) -> DomainChallengeResponse:
         domain = normalize_domain(payload.domain)
         try:
-            challenge = await run_in_threadpool(service.create_domain_challenge, domain, int(user["id"]))
+            challenge = await run_in_threadpool(service.create_domain_challenge, domain, int(user["id"]) if user else None)
         except sqlite3.IntegrityError as exc:
             raise HTTPException(status_code=409, detail="domain is already verified") from exc
         return DomainChallengeResponse(
@@ -161,10 +155,10 @@ def create_api_router(settings: DdnsSettings, store: DdnsStore, service: DdnsSer
     )
     async def verify_domain(
         payload: VerifyDomainRequest,
-        user: dict[str, str | int] = user_dependency,
+        user: dict[str, str | int] | None = optional_user_dependency,
     ) -> VerifyDomainResponse:
         domain = normalize_domain(payload.domain)
-        found, challenge = await run_in_threadpool(service.verify_domain, domain, payload.claim_secret, int(user["id"]))
+        found, challenge = await run_in_threadpool(service.verify_domain, domain, payload.claim_secret, int(user["id"]) if user else None)
         if not found:
             return VerifyDomainResponse(
                 domain=domain,
@@ -189,14 +183,14 @@ def create_api_router(settings: DdnsSettings, store: DdnsStore, service: DdnsSer
     )
     async def create_custom_hostname(
         payload: CustomHostnameRequest,
-        user: dict[str, str | int] = user_dependency,
+        user: dict[str, str | int] | None = optional_user_dependency,
     ) -> HostnameCredentials:
         account = await run_in_threadpool(
             service.create_custom_account,
             payload.hostname,
             payload.claim_secret,
             payload.username,
-            int(user["id"]),
+            int(user["id"]) if user else None,
         )
         return _credentials_response(service, account)
 

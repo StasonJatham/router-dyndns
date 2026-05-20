@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -324,6 +325,40 @@ def test_custom_hostname_after_dns_verification(tmp_path: Path, monkeypatch) -> 
     assert response.status_code == 200
     assert "home.example.net" in response.text
     assert "Update-URL:" in response.text
+
+
+def test_custom_domain_flow_works_without_login(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(ddns_service, "dns_txt_contains", lambda name, expected: True)
+    app = make_app(
+        DdnsSettings(
+            database_path=tmp_path / "ddns.sqlite3",
+            admin_password="admin",
+            public_base_url="http://ddns.example.net",
+        )
+    )
+    client = TestClient(app)
+
+    challenge = client.post("/request-domain", data={"domain": "example.net"})
+    assert challenge.status_code == 200
+    assert "Private claim link" in challenge.text
+    assert "/d/" in challenge.text
+
+    claim_secret = re.search(r"/d/([A-Za-z0-9_-]+)", challenge.text).group(1)
+    claim_page = client.get(f"/d/{claim_secret}")
+    assert claim_page.status_code == 200
+    assert "TXT value" in claim_page.text
+
+    verify = client.post("/verify-domain", data={"domain": "example.net", "claim_secret": claim_secret})
+    assert verify.status_code == 200
+    assert "Create credentials" in verify.text
+
+    created = client.post(
+        "/accounts",
+        data={"mode": "custom", "hostname": "home.example.net", "claim_secret": claim_secret},
+    )
+    assert created.status_code == 200
+    assert "home.example.net" in created.text
+    assert "Update-URL:" in created.text
 
 
 def test_api_docs_include_versioned_ddns_api(tmp_path: Path) -> None:

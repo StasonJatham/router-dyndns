@@ -12,17 +12,13 @@ If you want a lightweight DuckDNS / Dynu / No-IP style service that you control 
 
 - **Self-hosted Dynamic DNS provider** for home labs, small ISPs, communities, and private infrastructure.
 - **FRITZ!Box compatible**: copy the generated `Update-URL`, `Domainnamen`, `Benutzername`, and `Kennwort` straight into the German FRITZ!Box DynDNS form.
-- **No account required for basic hostnames**: generate a cryptographically random provider hostname and private management link.
-- **Custom domain support**: users enter a domain, add a DNS TXT record, then press a button to verify ownership before credentials are issued.
+- **No registration required**: provider hostnames and custom-domain setup both use private magic links.
+- **Custom domain support**: users enter a domain, save the private claim link, add a DNS TXT record, then press a button to verify ownership before credentials are issued.
 - **Real DNS publishing** through **Cloudflare** or **RFC 2136** with A and AAAA support.
 - **Small-server friendly**: FastAPI, SQLite WAL, simple Docker deployment, and no heavy background platform.
 - **API first**: OpenAPI, Swagger UI, ReDoc, and JSON endpoints under `/api/v1`.
 
 ## Screenshots
-
-### Dashboard
-
-![RouterPulse dashboard for router hostnames](docs/screenshots/dashboard.png)
 
 ### Generate Router Credentials
 
@@ -63,7 +59,7 @@ That means users always have a current hostname for VPN, remote access, self-hos
 | Custom domains | TXT challenge verification before hostname creation |
 | Persistence | SQLite with WAL mode |
 | API | FastAPI, OpenAPI, Swagger UI, ReDoc |
-| Auth model | Anonymous magic links for simple hostnames, login workspace for custom domains |
+| Auth model | Private magic links for hostnames and custom-domain claims; optional account workspace for dashboards |
 | Operations | Rate limiting, update logs, cleanup jobs, Docker, Caddy example |
 
 ## Quick Start
@@ -162,11 +158,12 @@ Prefer `/u/<slug>` for managed service use because the router request cannot cha
 Custom domains are intentionally simple:
 
 1. Enter the domain.
-2. Add the generated TXT record at your DNS provider.
-3. Press **I added it, check DNS**.
-4. Create router credentials after the TXT record verifies.
+2. Save the private claim link.
+3. Add the generated TXT record at your DNS provider.
+4. Press **I added it, check DNS**.
+5. Create router credentials after the TXT record verifies.
 
-RouterPulse stores the domain claim in SQLite and only creates hostnames below verified, publishable zones.
+RouterPulse stores the domain claim in SQLite and only creates hostnames below verified, publishable zones. The private claim link is the bearer credential for returning later after DNS propagation.
 
 ## HTTP API
 
@@ -177,9 +174,9 @@ The JSON API is available under `/api/v1`.
 | `POST /api/v1/hostnames/magic` | Create an anonymous provider-owned hostname. |
 | `GET /api/v1/management/{management_slug}` | Inspect a hostname by private management link. |
 | `DELETE /api/v1/management/{management_slug}` | Delete a hostname and its DNS records. |
-| `POST /api/v1/domains/challenges` | Create a TXT challenge. Requires login. |
-| `POST /api/v1/domains/verify` | Verify a TXT challenge. Requires login. |
-| `POST /api/v1/hostnames/custom` | Create a custom hostname below a verified domain. Requires login. |
+| `POST /api/v1/domains/challenges` | Create a TXT challenge and private claim secret. |
+| `POST /api/v1/domains/verify` | Verify a TXT challenge with the claim secret. |
+| `POST /api/v1/hostnames/custom` | Create a custom hostname below a verified domain with the claim secret. |
 | `GET /api/v1/updates/{update_slug}` | JSON update endpoint for routers or automation. |
 
 Example:

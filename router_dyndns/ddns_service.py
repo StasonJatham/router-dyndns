@@ -136,6 +136,11 @@ class DdnsService:
         slug = urllib.parse.quote(account["management_slug"])
         return f"{base}/m/{slug}"
 
+    def domain_claim_url(self, challenge: dict[str, str | None]) -> str:
+        base = self.settings.public_base_url.rstrip("/")
+        secret = urllib.parse.quote(str(challenge["claim_secret"]))
+        return f"{base}/d/{secret}"
+
     def random_managed_hostname(self) -> str:
         suffix = self.settings.hostname_suffix.strip().lower().strip(".")
         if not suffix:

@@ -181,6 +181,13 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="not found")
         return _render_management_page(service, settings, management_slug, account)
 
+    @app.get("/d/{claim_secret}", response_class=HTMLResponse)
+    def manage_domain_claim(claim_secret: str) -> str:
+        challenge = store.get_domain_challenge_by_secret(claim_secret)
+        if not challenge:
+            raise HTTPException(status_code=404, detail="not found")
+        return _render_public_home(service, settings, None, None, challenge)
+
     @app.post("/m/{management_slug}/delete")
     def delete_magic(management_slug: str) -> Response:
         account = store.get_account_by_management_slug(management_slug)
@@ -212,46 +219,52 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
     @app.post("/request-domain", response_class=HTMLResponse)
     async def request_domain(request: Request) -> str:
         user = await run_in_threadpool(current_user, request)
-        if not user:
-            raise HTTPException(status_code=401, detail="authentication required")
         form = _parse_form(await request.body())
         try:
-            challenge = await run_in_threadpool(service.create_domain_challenge, _first_form_value(form, "domain"), int(user["id"]))
+            challenge = await run_in_threadpool(
+                service.create_domain_challenge,
+                _first_form_value(form, "domain"),
+                int(user["id"]) if user else None,
+            )
         except sqlite3.IntegrityError as exc:
             raise HTTPException(status_code=409, detail="domain is already verified") from exc
-        return _render_user_home(service, settings, user, store.list_accounts(int(user["id"])), None, None, challenge)
+        if user:
+            return _render_user_home(service, settings, user, store.list_accounts(int(user["id"])), None, None, challenge)
+        return _render_public_home(service, settings, None, None, challenge)
 
     @app.post("/verify-domain", response_class=HTMLResponse)
     async def verify_domain(request: Request) -> str:
         user = await run_in_threadpool(current_user, request)
-        if not user:
-            raise HTTPException(status_code=401, detail="authentication required")
         form = _parse_form(await request.body())
         domain = normalize_domain(_first_form_value(form, "domain"))
         claim_secret = _first_form_value(form, "claim_secret")
-        found, challenge = await run_in_threadpool(service.verify_domain, domain, claim_secret, int(user["id"]))
+        owner_user_id = int(user["id"]) if user else None
+        found, challenge = await run_in_threadpool(service.verify_domain, domain, claim_secret, owner_user_id)
         if not found:
+            message = "TXT record not found yet. DNS propagation can take a few minutes."
+            if not user:
+                return _render_public_home(service, settings, None, message, challenge)
             return _render_user_home(
                 service,
                 settings,
                 user,
                 store.list_accounts(int(user["id"])),
                 None,
-                "TXT record not found yet. DNS propagation can take a few minutes.",
+                message,
                 challenge,
             )
+        if not user:
+            return _render_public_home(service, settings, None, "Domain verified. You can now create a hostname under it.", challenge)
         return _render_user_home(service, settings, user, store.list_accounts(int(user["id"])), None, "Domain verified. You can now create a hostname under it.", challenge)
 
     @app.post("/accounts", response_class=HTMLResponse)
     async def self_service_account(request: Request) -> str:
         user = await run_in_threadpool(current_user, request)
-        if not user:
-            raise HTTPException(status_code=401, detail="authentication required")
         form = _parse_form(await request.body())
         mode = _first_form_value(form, "mode")
         username = _first_form_value(form, "username") or None
         if mode == "managed":
-            account = await run_in_threadpool(service.create_managed_account, username, int(user["id"]))
+            account = await run_in_threadpool(service.create_managed_account, username, int(user["id"]) if user else None)
         else:
             claim_secret = _first_form_value(form, "claim_secret")
             account = await run_in_threadpool(
@@ -259,8 +272,10 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
                 _first_form_value(form, "hostname"),
                 claim_secret,
                 username,
-                int(user["id"]),
+                int(user["id"]) if user else None,
             )
+        if not user:
+            return _render_public_home(service, settings, account, None)
         return _render_user_home(service, settings, user, store.list_accounts(int(user["id"])), account, None, None)
 
     @app.post("/register")
@@ -428,6 +443,7 @@ def _render_public_home(
     suffix = html.escape(settings.hostname_suffix or "your DynDNS domain")
     created_html = _credentials_panel(service, created_account)
     message_html = _message_band(message) if message and not challenge else ""
+    challenge_html = _custom_domain_flow(service, challenge, message)
     return _page(
         "router-dyndns",
         f"""
@@ -440,7 +456,7 @@ def _render_public_home(
               <p class="lead">Create a secure update endpoint under {suffix}. Provider hostnames are anonymous; custom domains require DNS proof.</p>
               <div class="hero-actions">
                 <a class="button" href="#create">Create hostname</a>
-                <a class="button secondary" href="/login">Use custom domain</a>
+                <a class="button secondary" href="#custom-domain">Use custom domain</a>
               </div>
             </div>
           </section>
@@ -461,16 +477,7 @@ def _render_public_home(
               </form>
             </div>
           </section>
-          <section class="section section-dark">
-            <div class="container split-row">
-              <div>
-                <p class="eyebrow">Custom domains</p>
-                <h2>Use your own domain after TXT verification.</h2>
-                <p class="section-copy">Enter your domain, add the TXT record we show you, then press the check button. We verify public DNS before credentials are issued.</p>
-              </div>
-              <a class="button secondary-on-dark" href="/login">Set up domain</a>
-            </div>
-          </section>
+          {challenge_html}
           <footer class="footer">
             <div class="container footer-links">
               <a href="/docs">API docs</a>
@@ -563,8 +570,8 @@ def _render_auth_page(settings: DdnsSettings, message: str | None) -> str:
           <section class="hero-band compact">
             <div class="container hero-inner">
               <p class="eyebrow">Custom domains</p>
-              <h1>Set up a verified domain.</h1>
-              <p class="lead">Create a small private workspace, enter your domain, add the TXT record we generate, then check public DNS.</p>
+              <h1>Optional account workspace.</h1>
+              <p class="lead">Most users do not need this. Magic links handle normal hostname and domain setup; accounts are only for people who want a persistent dashboard.</p>
             </div>
           </section>
           {_message_band(message) if message else ""}
@@ -605,7 +612,7 @@ def _render_public_page(
 ) -> str:
     if user:
         return _render_user_home(service, settings, user, accounts, created_account, message, challenge)
-    return _render_auth_page(settings, message)
+    return _render_public_home(service, settings, created_account, message, challenge)
 
 
 def _top_nav(label: str | None = None, show_logout: bool = False, links: str = "") -> str:
@@ -615,7 +622,7 @@ def _top_nav(label: str | None = None, show_logout: bool = False, links: str = "
     if show_logout:
         account_html += '<form method="post" action="/logout"><button class="nav-button" type="submit">Logout</button></form>'
     elif not links:
-        account_html += '<a class="nav-button" href="/login">Domain setup</a>'
+        account_html += '<a class="nav-button" href="/#custom-domain">Domain setup</a>'
     return f"""
     <nav class="top-nav">
       <div class="container nav-inner">
@@ -637,6 +644,7 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
         token = str(challenge["token"])
         claim_secret = html.escape(str(challenge.get("claim_secret") or ""))
         verification_name = service.verification_name(str(challenge["domain"]))
+        claim_url = service.domain_claim_url(challenge)
         status = html.escape(message or "Add this TXT record at your DNS provider, then press the check button.")
         challenge_html = f"""
         <div class="step-card">
@@ -645,6 +653,7 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
           <p class="note">{status}</p>
           {_copy_row("TXT name", verification_name)}
           {_copy_row("TXT value", token)}
+          {_copy_row("Private claim link", claim_url)}
           <form method="post" action="/verify-domain" class="inline-form">
             <input type="hidden" name="domain" value="{domain}">
             <input type="hidden" name="claim_secret" value="{claim_secret}">
@@ -680,7 +689,7 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
             """
 
     return f"""
-    <section class="section section-dark">
+    <section class="section section-dark" id="custom-domain">
       <div class="container">
         <div class="section-heading">
           <div>

@@ -243,6 +243,19 @@ class DdnsStore:
             challenge = conn.execute(sql, params).fetchone()
         return dict(challenge) if challenge else None
 
+    def get_domain_challenge_by_secret(self, claim_secret: str) -> dict[str, str | None] | None:
+        with self.connect() as conn:
+            conn.row_factory = sqlite3.Row
+            challenge = conn.execute(
+                "SELECT domain, token, verified_at FROM domain_challenges WHERE claim_hash = ?",
+                (hash_lookup_token(claim_secret),),
+            ).fetchone()
+        if not challenge:
+            return None
+        result = dict(challenge)
+        result["claim_secret"] = claim_secret
+        return result
+
     def is_domain_verified(
         self,
         domain: str,
