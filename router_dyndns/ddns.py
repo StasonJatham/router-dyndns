@@ -334,34 +334,6 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
             store.list_cleanup_runs(),
             store.list_update_events(25),
             None,
-            None,
-        )
-
-    @app.post("/admin/accounts", include_in_schema=False)
-    async def admin_create_account(request: Request, _: None = Depends(authenticate_admin)) -> Response:
-        form = await _request_form(request, settings)
-        require_admin_csrf(settings, _first_form_value(form, "csrf"))
-        hostname = normalize_hostname(_first_form_value(form, "hostname"), settings)
-        username = _first_form_value(form, "username") or None
-        if not hostname:
-            raise HTTPException(status_code=400, detail="hostname is required")
-        if settings.allowed_hosts and hostname not in settings.allowed_hosts:
-            raise HTTPException(status_code=403, detail="hostname is not allowed")
-        try:
-            account = store.create_account(hostname, username)
-        except sqlite3.IntegrityError as exc:
-            raise HTTPException(status_code=409, detail="hostname already exists") from exc
-        return HTMLResponse(
-            _render_admin_page(
-                service,
-                settings,
-                store.list_accounts(),
-                store.list_domain_challenges(),
-                store.list_cleanup_runs(),
-                store.list_update_events(25),
-                account,
-                None,
-            )
         )
 
     @app.post("/admin/accounts/delete", include_in_schema=False)
@@ -414,7 +386,6 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
                 store.list_domain_challenges(),
                 store.list_cleanup_runs(),
                 store.list_update_events(25),
-                None,
                 notice,
             )
         )
@@ -439,7 +410,6 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
                 store.list_domain_challenges(),
                 store.list_cleanup_runs(),
                 store.list_update_events(25),
-                None,
                 notice,
             )
         )
@@ -769,10 +739,6 @@ def _credentials_panel(service: DdnsService, created_account: dict[str, str] | N
     """
 
 
-def _created_account_panel(service: DdnsService, created_account: dict[str, str] | None) -> str:
-    return _credentials_panel(service, created_account)
-
-
 def _admin_secret_panel(title: str, rows: list[str]) -> str:
     return f"""
     <section class="section success-section">
@@ -913,7 +879,6 @@ def _render_admin_page(
     domain_challenges: list[dict[str, str | None]],
     cleanup_runs: list[dict[str, str | int]],
     update_events: list[dict[str, str | None]],
-    created_account: dict[str, str] | None,
     notice_html: str | None,
 ) -> str:
     csrf = html.escape(admin_csrf_token(settings))
@@ -929,11 +894,6 @@ def _render_admin_page(
     event_rows = "\n".join(_event_row(event) for event in update_events) or """
       <tr><td colspan="6" class="empty">No update events yet.</td></tr>
     """
-    suffix_help = (
-        f"Short names are expanded under {html.escape(settings.hostname_suffix)}."
-        if settings.hostname_suffix
-        else "Use a full hostname, for example home.example.net."
-    )
     return _page(
         "DynDNS Admin",
         f"""
@@ -942,12 +902,11 @@ def _render_admin_page(
           <section class="section admin-heading">
             <div class="container">
               <p class="eyebrow">DynDNS aktiv</p>
-              <h1>Router credentials</h1>
-              <p class="lead">Create, inspect, and retire router update credentials.</p>
+              <h1>Operator console</h1>
+              <p class="lead">Inspect hostnames, verify domain claims, rotate links, run cleanup, and review router update events.</p>
             </div>
           </section>
 
-          {_created_account_panel(service, created_account)}
           {notice_html or ""}
 
           <section class="section">
@@ -961,30 +920,6 @@ def _render_admin_page(
               <form method="post" action="/admin/cleanup" class="col-lg-5 card card-body gap-3" aria-label="Run cleanup now">
                 <input type="hidden" name="csrf" value="{csrf}">
                 <button type="submit" class="btn btn-primary rounded-pill">Run cleanup now</button>
-              </form>
-              </div>
-            </div>
-          </section>
-
-          <section class="section">
-            <div class="container">
-              <div class="row g-4 align-items-start">
-              <div class="col-lg-7">
-                <p class="eyebrow">Generate credentials</p>
-                <h2>Router credentials</h2>
-                <p class="section-copy">Generated credentials produce the FRITZ!Box fields: Update-URL, Domainnamen, Benutzername, Kennwort.</p>
-                <p class="small text-secondary mb-0 mt-2">{suffix_help}</p>
-              </div>
-              <form method="post" action="/admin/accounts" class="col-lg-5 card card-body gap-3" aria-label="Create router credentials">
-                <input type="hidden" name="csrf" value="{csrf}">
-                <label>Domainnamen
-                  <input class="form-control" name="hostname" placeholder="home.example.net" autocomplete="off" autocapitalize="none" spellcheck="false" required>
-                </label>
-                <label>Benutzername
-                  <input class="form-control" name="username" placeholder="auto-generated" autocomplete="off">
-                  <span class="form-text m-0">Leave empty to generate one from the hostname.</span>
-                </label>
-                <button type="submit" class="btn btn-primary rounded-pill">Generate credentials</button>
               </form>
               </div>
             </div>

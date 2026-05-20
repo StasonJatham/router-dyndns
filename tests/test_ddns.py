@@ -152,7 +152,7 @@ def test_generated_account_cannot_update_other_hostname(tmp_path: Path) -> None:
     assert response.status_code == 401
 
 
-def test_admin_page_shows_account_form(tmp_path: Path) -> None:
+def test_admin_page_shows_operator_views_without_create_form(tmp_path: Path) -> None:
     database_path = tmp_path / "ddns.sqlite3"
     store = DdnsStore(database_path)
     store.create_domain_challenge("example.net")
@@ -163,11 +163,11 @@ def test_admin_page_shows_account_form(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
-    assert "Update-URL" in response.text
-    assert "Domainnamen" in response.text
-    assert "Benutzername" in response.text
-    assert "Kennwort" in response.text
+    assert "Operator console" in response.text
+    assert "Generate credentials" not in response.text
+    assert 'action="/admin/accounts"' not in response.text
     assert "Scheduled cleanup" in response.text
+    assert "Active credentials" in response.text
     assert "Domain claims" in response.text
     assert "Recent events" in response.text
     assert "example.net" in response.text
@@ -178,9 +178,9 @@ def test_admin_posts_require_csrf(tmp_path: Path) -> None:
     client = TestClient(app)
 
     response = client.post(
-        "/admin/accounts",
+        "/admin/cleanup",
         auth=("admin", "admin"),
-        data={"hostname": "home.example.net"},
+        data={},
     )
 
     assert response.status_code == 403
