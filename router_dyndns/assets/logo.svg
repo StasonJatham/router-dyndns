@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title id="title">router-dyndns logo</title>
+  <defs>
+    <linearGradient id="navy" x1="48" x2="208" y1="52" y2="220" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#17395d"/>
+      <stop offset="1" stop-color="#071727"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="44" x2="218" y1="72" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14b8ff"/>
+      <stop offset="1" stop-color="#0066cc"/>
+    </linearGradient>
+  </defs>
+  <path fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="30" d="M60 155a78 78 0 0 1 112-70"/>
+  <path fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="30" d="M184 88a78 78 0 0 1 12 81"/>
+  <path fill="#fff" d="m198 64 33 20-32 22-5-22z"/>
+  <path fill="none" stroke="url(#blue)" stroke-linecap="round" stroke-linejoin="round" stroke-width="18" d="M60 155a78 78 0 0 1 112-70"/>
+  <path fill="none" stroke="url(#blue)" stroke-linecap="round" stroke-linejoin="round" stroke-width="18" d="M184 88a78 78 0 0 1 12 81"/>
+  <path fill="url(#blue)" d="m198 74 21 12-20 14-3-14z"/>
+  <rect x="46" y="172" width="164" height="44" rx="18" fill="#fff"/>
+  <rect x="56" y="181" width="144" height="26" rx="11" fill="url(#navy)"/>
+  <path fill="#fff" d="M80 202h18v19a9 9 0 0 1-18 0zm78 0h18v19a9 9 0 0 1-18 0z"/>
+  <circle cx="86" cy="194" r="4" fill="#fff"/>
+  <circle cx="104" cy="194" r="4" fill="#fff"/>
+  <circle cx="122" cy="194" r="4" fill="#fff"/>
+  <circle cx="128" cy="119" r="47" fill="#fff"/>
+  <circle cx="128" cy="119" r="37" fill="url(#navy)"/>
+  <path fill="none" stroke="#fff" stroke-linecap="round" stroke-width="8" d="M102 94c19 6 38 18 53 35M98 132c22 8 46 6 64-12M122 83c-10 22-10 49 0 72M149 88c8 20 8 44-2 63"/>
+  <circle cx="108" cy="105" r="10" fill="url(#navy)" stroke="#fff" stroke-width="7"/>
+  <circle cx="148" cy="128" r="10" fill="url(#navy)" stroke="#fff" stroke-width="7"/>
+  <circle cx="120" cy="148" r="9" fill="url(#navy)" stroke="#fff" stroke-width="7"/>
+  <path fill="none" stroke="#fff" stroke-linecap="round" stroke-width="24" d="M91 65a53 53 0 0 1 74 0"/>
+  <path fill="none" stroke="#fff" stroke-linecap="round" stroke-width="24" d="M109 86a28 28 0 0 1 38 0"/>
+  <path fill="none" stroke="url(#navy)" stroke-linecap="round" stroke-width="12" d="M91 65a53 53 0 0 1 74 0"/>
+  <path fill="none" stroke="url(#navy)" stroke-linecap="round" stroke-width="12" d="M109 86a28 28 0 0 1 38 0"/>
+</svg>

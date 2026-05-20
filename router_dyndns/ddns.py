@@ -4,10 +4,11 @@ import html
 import secrets
 import sqlite3
 import urllib.parse
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 from starlette.concurrency import run_in_threadpool
 
 from .ddns_api import create_api_router
@@ -58,6 +59,8 @@ OPENAPI_TAGS = [
         "description": "Operator-only HTML and JSON endpoints protected by the admin password.",
     },
 ]
+
+ASSET_DIR = Path(__file__).with_name("assets")
 
 
 def make_app(settings: DdnsSettings | None = None) -> FastAPI:
@@ -347,8 +350,16 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
         return "ok"
 
     @app.get("/favicon.ico", include_in_schema=False)
-    def favicon() -> Response:
-        return Response(status_code=204)
+    def favicon() -> FileResponse:
+        return FileResponse(ASSET_DIR / "favicon.ico", media_type="image/x-icon")
+
+    @app.get("/logo.svg", include_in_schema=False)
+    def logo_svg() -> FileResponse:
+        return FileResponse(ASSET_DIR / "logo.svg", media_type="image/svg+xml")
+
+    @app.get("/logo.png", include_in_schema=False)
+    def logo_png() -> FileResponse:
+        return FileResponse(ASSET_DIR / "logo.png", media_type="image/png")
 
     @app.get("/u/{update_slug}", response_class=PlainTextResponse, response_model=None)
     def slug_update(
@@ -608,7 +619,7 @@ def _top_nav(label: str | None = None, show_logout: bool = False, links: str = "
     return f"""
     <nav class="top-nav">
       <div class="container nav-inner">
-        <a class="brand" href="/">router-dyndns</a>
+        <a class="brand" href="/"><img src="/logo.svg" alt="" width="28" height="28">router-dyndns</a>
         <div class="nav-actions">
           {links}
           {account_html}
@@ -962,6 +973,9 @@ def _page(title: str, body: str) -> str:
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{html.escape(title)}</title>
+        <link rel="icon" href="/favicon.ico" sizes="any">
+        <link rel="icon" href="/logo.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/logo.png">
         <style>
           :root {{
             color-scheme: light;
@@ -989,7 +1003,8 @@ def _page(title: str, body: str) -> str:
           .container {{ width: min(1040px, calc(100% - 40px)); margin: 0 auto; }}
           .top-nav {{ position: sticky; top: 0; z-index: 20; min-height: 52px; display: flex; align-items: center; background: rgba(245, 245, 247, 0.86); border-bottom: 1px solid rgba(0, 0, 0, 0.08); backdrop-filter: saturate(180%) blur(20px); }}
           .nav-inner {{ min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }}
-          .brand {{ color: var(--ink); font-size: 15px; font-weight: 650; letter-spacing: -0.01em; text-decoration: none; white-space: nowrap; }}
+          .brand {{ display: inline-flex; align-items: center; gap: 9px; color: var(--ink); font-size: 15px; font-weight: 650; letter-spacing: -0.01em; text-decoration: none; white-space: nowrap; }}
+          .brand img {{ width: 28px; height: 28px; display: block; }}
           .nav-actions {{ min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 14px; }}
           .nav-actions a:not(.nav-button) {{ color: var(--muted); font-size: 13px; text-decoration: none; white-space: nowrap; }}
           .nav-actions a:not(.nav-button):hover {{ color: var(--ink); }}
