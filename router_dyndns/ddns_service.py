@@ -160,7 +160,7 @@ class DdnsService:
         return None
 
     def verification_name(self, domain: str) -> str:
-        prefix = self.settings.verification_prefix.strip().strip(".") or "_router_dyndns-ddns"
+        prefix = self.settings.verification_prefix.strip().strip(".") or "_karldns"
         return f"{prefix}.{domain}"
 
     def hostname_is_publishable(self, hostname: str) -> bool:

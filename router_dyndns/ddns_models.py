@@ -16,7 +16,7 @@ class DdnsSettings(BaseModel):
     public_base_url: str = Field(default="http://localhost:8080")
     trusted_hosts: set[str] = Field(default_factory=set)
     hostname_suffix: str = Field(default="")
-    verification_prefix: str = Field(default="_router_dyndns-ddns")
+    verification_prefix: str = Field(default="_karldns")
     rate_limit_per_minute: int = Field(default=60, ge=1, le=10_000)
     admin_rate_limit_per_minute: int = Field(default=20, ge=1, le=10_000)
     max_request_body_bytes: int = Field(default=16_384, ge=1024, le=1_048_576)
@@ -85,7 +85,7 @@ class DdnsSettings(BaseModel):
             public_base_url=os.getenv("DDNS_PUBLIC_BASE_URL", "http://localhost:8080"),
             trusted_hosts=trusted_hosts,
             hostname_suffix=os.getenv("DDNS_HOSTNAME_SUFFIX", ""),
-            verification_prefix=os.getenv("DDNS_VERIFICATION_PREFIX", "_router_dyndns-ddns"),
+            verification_prefix=os.getenv("DDNS_VERIFICATION_PREFIX", "_karldns"),
             rate_limit_per_minute=_env_int("DDNS_RATE_LIMIT_PER_MINUTE", 60),
             admin_rate_limit_per_minute=_env_int("DDNS_ADMIN_RATE_LIMIT_PER_MINUTE", 20),
             max_request_body_bytes=_env_int("DDNS_MAX_REQUEST_BODY_BYTES", 16_384),

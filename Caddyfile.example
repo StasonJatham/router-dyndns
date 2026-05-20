@@ -1,4 +1,4 @@
-ddns.example.net {
+karldns.de {
   encode zstd gzip
   reverse_proxy ddns:8080
 }

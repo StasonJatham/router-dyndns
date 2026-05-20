@@ -1,14 +1,14 @@
-# RouterPulse
+# KarlDNS
 
 **Self-hosted DynDNS for FRITZ!Box, OpenWrt, pfSense, OPNsense, UniFi, MikroTik, and any router that can call a custom DDNS update URL.**
 
-RouterPulse is the friendly name for `router-dyndns`: a small FastAPI Dynamic DNS provider you can run on your own VPS. It gives users FRITZ!Box-ready DynDNS credentials, keeps public A/AAAA records updated through Cloudflare or RFC 2136, provides generated hostnames that work as CNAME targets, and supports verified custom domains with DNS TXT ownership checks.
+KarlDNS is the friendly name for `karldns`: a small FastAPI Dynamic DNS provider you can run on your own VPS. It gives users FRITZ!Box-ready DynDNS credentials, keeps public A/AAAA records updated through Cloudflare or RFC 2136, provides generated hostnames that work as CNAME targets, and supports verified custom domains with DNS TXT ownership checks.
 
-If you want a lightweight DuckDNS / Dynu / No-IP style service that you control yourself, RouterPulse is built for that use case.
+If you want a lightweight DuckDNS / Dynu / No-IP style service that you control yourself, KarlDNS is built for that use case.
 
-![RouterPulse self-hosted DynDNS home screen](docs/screenshots/home.png)
+![KarlDNS self-hosted DynDNS home screen](docs/screenshots/home.png)
 
-## Why RouterPulse?
+## Why KarlDNS?
 
 - **Self-hosted Dynamic DNS provider** for home labs, small ISPs, communities, and private infrastructure.
 - **FRITZ!Box compatible**: copy the generated `Update-URL`, `Domainnamen`, `Benutzername`, and `Kennwort` straight into the German FRITZ!Box DynDNS form.
@@ -31,13 +31,13 @@ If you want a lightweight DuckDNS / Dynu / No-IP style service that you control 
 
 ## What It Does
 
-RouterPulse lets you host your own managed DynDNS service:
+KarlDNS lets you host your own managed DynDNS service:
 
-1. A user opens your RouterPulse URL.
-2. They generate a random hostname like `a1b2c3d4.ddns.example.net`, or verify their own domain with a TXT record.
-3. RouterPulse shows the exact router settings for the DynDNS form.
+1. A user opens your KarlDNS URL.
+2. They generate a random hostname like `a1b2c3d4.karldns.de`, or verify their own domain with a TXT record.
+3. KarlDNS shows the exact router settings for the DynDNS form.
 4. The router periodically calls the update URL with its current public IPv4/IPv6 address.
-5. RouterPulse publishes the matching DNS records through your configured DNS backend.
+5. KarlDNS publishes the matching DNS records through your configured DNS backend.
 6. If the user wants their own DNS name, they can create a CNAME to the generated hostname.
 
 That means users always have a current hostname for VPN, remote access, self-hosted apps, home servers, NAS devices, and lab networks.
@@ -81,10 +81,10 @@ Run locally:
 ```bash
 export DDNS_ADMIN_PASSWORD='replace-with-a-long-random-value'
 export DDNS_PUBLIC_BASE_URL='http://localhost:8080'
-export DDNS_HOSTNAME_SUFFIX='ddns.example.net'
+export DDNS_HOSTNAME_SUFFIX='karldns.de'
 export DDNS_DATABASE='./ddns.sqlite3'
 
-router-dyndns serve --host 127.0.0.1 --port 8080
+karldns serve --host 127.0.0.1 --port 8080
 ```
 
 Open:
@@ -103,12 +103,12 @@ The public OpenAPI schema documents the developer API under `/api/v1`. Admin/ope
 For an internet-facing DynDNS service, run behind HTTPS and require a real DNS backend:
 
 ```bash
-export DDNS_PUBLIC_BASE_URL='https://ddns.example.net'
-export DDNS_HOSTNAME_SUFFIX='ddns.example.net'
+export DDNS_PUBLIC_BASE_URL='https://karldns.de'
+export DDNS_HOSTNAME_SUFFIX='karldns.de'
 export DDNS_DATABASE='/data/ddns.sqlite3'
-export DDNS_TRUSTED_HOSTS='ddns.example.net'
+export DDNS_TRUSTED_HOSTS='karldns.de'
 export DDNS_REQUIRE_DNS_PROVIDER=1
-export DDNS_DNS_ZONES='ddns.example.net'
+export DDNS_DNS_ZONES='karldns.de'
 export DDNS_TRUSTED_PROXY_IPS='127.0.0.1,::1'
 export DDNS_RATE_LIMIT_PER_MINUTE=60
 export DDNS_ADMIN_RATE_LIMIT_PER_MINUTE=20
@@ -127,14 +127,14 @@ export DDNS_CLOUDFLARE_ZONE_ID='replace-with-cloudflare-zone-id'
 export DDNS_TTL=60
 ```
 
-Use a least-privilege Cloudflare API token limited to the zone RouterPulse should update.
+Use a least-privilege Cloudflare API token limited to the zone KarlDNS should update.
 
 ### RFC 2136 DNS Backend
 
 ```bash
 export DDNS_DNS_PROVIDER='rfc2136'
 export DDNS_RFC2136_SERVER='127.0.0.1'
-export DDNS_RFC2136_ZONE='ddns.example.net'
+export DDNS_RFC2136_ZONE='karldns.de'
 export DDNS_RFC2136_KEY_NAME='ddns-key'
 export DDNS_RFC2136_KEY_SECRET='replace-with-tsig-secret'
 export DDNS_TTL=60
@@ -146,7 +146,7 @@ export DDNS_TTL=60
 
 Create a hostname in the web UI. For the normal accountless flow, the generated `Update-URL` already contains the secret update slug. Put that URL into the router and use the generated hostname as `Domainnamen`.
 
-RouterPulse also shows optional compatibility fields for routers that insist on separate credentials:
+KarlDNS also shows optional compatibility fields for routers that insist on separate credentials:
 
 - `Update-URL`
 - `Domainnamen`
@@ -157,17 +157,17 @@ RouterPulse also shows optional compatibility fields for routers that insist on 
 The generated FRITZ!Box URL uses the native placeholders:
 
 ```text
-https://ddns.example.net/u/<random-update-slug>?myip=<ipaddr>&myipv6=<ip6addr>
+https://karldns.de/u/<random-update-slug>?myip=<ipaddr>&myipv6=<ip6addr>
 ```
 
-FRITZ!Box replaces `<ipaddr>` and `<ip6addr>` with the current WAN IPv4/IPv6 address and sends an HTTP GET request to that URL whenever it detects an address change. RouterPulse returns DynDNS-style responses such as `good 203.0.113.10`, `nochg 203.0.113.10`, `badauth`, or `nohost`.
+FRITZ!Box replaces `<ipaddr>` and `<ip6addr>` with the current WAN IPv4/IPv6 address and sends an HTTP GET request to that URL whenever it detects an address change. KarlDNS returns DynDNS-style responses such as `good 203.0.113.10`, `nochg 203.0.113.10`, `badauth`, or `nohost`.
 
-This URL is enough for routers that only expose a single update URL field and do not send separate credentials. RouterPulse also shows a `One-box update URL` that embeds `hostname`, `username`, and `password` as query parameters for clients that require credential-style DynDNS URLs but do not expose separate credential fields. Treat both URLs as secrets.
+This URL is enough for routers that only expose a single update URL field and do not send separate credentials. KarlDNS also shows a `One-box update URL` that embeds `hostname`, `username`, and `password` as query parameters for clients that require credential-style DynDNS URLs but do not expose separate credential fields. Treat both URLs as secrets.
 
 The compatibility endpoint is also available:
 
 ```text
-https://ddns.example.net/nic/update?hostname=<domain>&myip=<ipaddr>&myipv6=<ip6addr>&username=<username>&password=<pass>
+https://karldns.de/nic/update?hostname=<domain>&myip=<ipaddr>&myipv6=<ip6addr>&username=<username>&password=<pass>
 ```
 
 Prefer `/u/<slug>` for managed service use because the router request cannot change the hostname.
@@ -178,30 +178,30 @@ Every generated hostname can be updated with curl, cron, a shell script, Home As
 
 ```bash
 # Explicit IPv4 update
-curl -sS 'https://ddns.example.net/u/<random-update-slug>?myip=203.0.113.10'
+curl -sS 'https://karldns.de/u/<random-update-slug>?myip=203.0.113.10'
 
 # Explicit IPv6 update
-curl -sS 'https://ddns.example.net/u/<random-update-slug>?myipv6=2001:db8::10'
+curl -sS 'https://karldns.de/u/<random-update-slug>?myipv6=2001:db8::10'
 
 # Use the request source IP
-curl -sS 'https://ddns.example.net/u/<random-update-slug>'
+curl -sS 'https://karldns.de/u/<random-update-slug>'
 ```
 
 The `/nic/update` compatibility endpoint also works for clients that expect hostname and credentials in the URL:
 
 ```bash
-curl -sS 'https://ddns.example.net/nic/update?hostname=home.example.net&username=router&password=<password>&myip=203.0.113.10'
+curl -sS 'https://karldns.de/nic/update?hostname=home.example.net&username=router&password=<password>&myip=203.0.113.10'
 ```
 
 ## Use Your Own Subdomain With CNAME
 
-Most users do not need domain verification. Generate a RouterPulse hostname first, then create a CNAME at your DNS provider:
+Most users do not need domain verification. Generate a KarlDNS hostname first, then create a CNAME at your DNS provider:
 
 ```dns
-home.example.com.  CNAME  a1b2c3d4.ddns.example.net.
+home.example.com.  CNAME  a1b2c3d4.karldns.de.
 ```
 
-Put the RouterPulse `Update-URL`, `Domainnamen`, `Benutzername`, and `Kennwort` into the router. The router updates `a1b2c3d4.ddns.example.net`; `home.example.com` follows through the CNAME.
+Put the KarlDNS `Update-URL`, `Domainnamen`, `Benutzername`, and `Kennwort` into the router. The router updates `a1b2c3d4.karldns.de`; `home.example.com` follows through the CNAME.
 
 Use a subdomain such as `home.example.com`. Root/apex domains like `example.com` usually cannot be plain CNAME records unless your DNS provider supports CNAME flattening or ALIAS/ANAME records.
 
@@ -209,7 +209,7 @@ The generated hostname is not a secret. Treat it like any public DNS name. The u
 
 ## Custom Domain Flow
 
-This flow is only needed when RouterPulse should publish A/AAAA records directly inside a user-owned domain instead of using a CNAME target.
+This flow is only needed when KarlDNS should publish A/AAAA records directly inside a user-owned domain instead of using a CNAME target.
 
 Custom-domain publishing is intentionally simple:
 
@@ -219,7 +219,7 @@ Custom-domain publishing is intentionally simple:
 4. Press **I added it, check DNS**.
 5. Create router credentials after the TXT record verifies.
 
-RouterPulse stores the domain claim in SQLite and only creates hostnames below verified, publishable zones. The private claim link is the bearer credential for returning later after DNS propagation.
+KarlDNS stores the domain claim in SQLite and only creates hostnames below verified, publishable zones. The private claim link is the bearer credential for returning later after DNS propagation.
 
 ## HTTP API
 
@@ -238,7 +238,7 @@ The JSON API is available under `/api/v1`.
 Example:
 
 ```bash
-curl -sS https://ddns.example.net/api/v1/hostnames/magic \
+curl -sS https://karldns.de/api/v1/hostnames/magic \
   -H 'content-type: application/json' \
   -d '{"username":"home-router"}'
 ```
@@ -260,7 +260,7 @@ docker compose up -d --build
 - Keep `.env` out of git.
 - Use a long random value for `DDNS_ADMIN_PASSWORD`.
 - Use a least-privilege DNS API token or TSIG key.
-- Set `DDNS_TRUSTED_HOSTS` to the public hostnames your reverse proxy will forward, for example `ddns.example.net`.
+- Set `DDNS_TRUSTED_HOSTS` to the public hostnames your reverse proxy will forward, for example `karldns.de`.
 - Configure `DDNS_TRUSTED_PROXY_IPS` only for reverse proxies that strip user-supplied forwarding headers.
 - Keep `/docs` and `/redoc` available for API users if you want a public developer surface. Admin routes are hidden from OpenAPI and still require Basic auth.
 - Leave cleanup enabled. The app periodically removes abandoned TXT challenges and generated hostnames that were never updated by a router.
@@ -282,12 +282,12 @@ Security and cleanup defaults:
 SQLite backup example:
 
 ```bash
-sqlite3 /data/ddns.sqlite3 ".backup '/backups/routerpulse.sqlite3'"
+sqlite3 /data/ddns.sqlite3 ".backup '/backups/karldns.sqlite3'"
 ```
 
 ## Project Status
 
-RouterPulse is suitable for self-hosting and private/public beta use when a real DNS backend is configured. For a larger public free DynDNS provider, add external abuse controls, monitoring, alerting, and a tested backup/restore process before launch.
+KarlDNS is suitable for self-hosting and private/public beta use when a real DNS backend is configured. For a larger public free DynDNS provider, add external abuse controls, monitoring, alerting, and a tested backup/restore process before launch.
 
 ## Development
 

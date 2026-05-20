@@ -229,7 +229,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
                 await cleanup_task
 
     app = FastAPI(
-        title="router_dyndns DDNS",
+        title="KarlDNS",
         summary="A small self-hosted DynDNS provider for FRITZ!Box routers.",
         description=(
             "Generate cryptographically random DynDNS endpoints, verify custom domains with DNS TXT "
@@ -301,7 +301,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
             raise HTTPException(
                 status_code=401,
                 detail="admin authentication required",
-                headers={"WWW-Authenticate": 'Basic realm="router_dyndns-ddns"'},
+                headers={"WWW-Authenticate": 'Basic realm="karldns"'},
             )
 
     def apply_update(
@@ -521,10 +521,6 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
     def favicon() -> FileResponse:
         return FileResponse(ASSET_DIR / "favicon.ico", media_type="image/x-icon")
 
-    @app.get("/logo.svg", include_in_schema=False)
-    def logo_svg() -> FileResponse:
-        return FileResponse(ASSET_DIR / "logo.svg", media_type="image/svg+xml")
-
     @app.get("/logo.png", include_in_schema=False)
     def logo_png() -> FileResponse:
         return FileResponse(ASSET_DIR / "logo.png", media_type="image/png")
@@ -647,13 +643,13 @@ def _render_public_home(
     message_html = _message_band(message) if message and not challenge else ""
     challenge_html = _custom_domain_flow(service, challenge, message)
     return _page(
-        "router-dyndns",
+        "KarlDNS",
         f"""
         <main id="main">
           {_top_nav()}
           <section class="hero-band">
             <div class="container text-center d-grid justify-items-center gap-3">
-              <img class="hero-logo" src="/logo.svg" alt="" width="92" height="92">
+              <img class="hero-logo" src="/logo.png" alt="" width="92" height="92">
               <p class="eyebrow">Dynamic DNS for FRITZ!Box and any router</p>
               <h1>The simplest way to keep a home IP updated.</h1>
               <div class="install-pill mx-auto">
@@ -677,7 +673,7 @@ def _render_public_home(
                 <p class="section-copy">The generated URL is the secret. FRITZ!Box replaces <code>&lt;ipaddr&gt;</code> and calls it when your public IP changes.</p>
                 <div class="terminal-card mt-4" aria-hidden="true">
                   <div class="terminal-dots"><span></span><span></span><span></span></div>
-                  <code>$ curl -sS 'https://ddns.example.net/u/&lt;secret&gt;?myip=203.0.113.10'</code>
+                  <code>$ curl -sS 'https://karldns.de/u/&lt;secret&gt;?myip=203.0.113.10'</code>
                   <code>good 203.0.113.10</code>
                 </div>
               </div>
@@ -698,9 +694,9 @@ def _render_public_home(
               <div class="terminal-card text-start mt-4">
                 <div class="terminal-dots"><span></span><span></span><span></span></div>
                 <code># explicit IPv4</code>
-                <code>curl -sS 'https://ddns.example.net/u/&lt;secret&gt;?myip=203.0.113.10'</code>
+                <code>curl -sS 'https://karldns.de/u/&lt;secret&gt;?myip=203.0.113.10'</code>
                 <code># source IP fallback</code>
-                <code>curl -sS 'https://ddns.example.net/u/&lt;secret&gt;'</code>
+                <code>curl -sS 'https://karldns.de/u/&lt;secret&gt;'</code>
               </div>
             </div>
           </section>
@@ -727,7 +723,7 @@ def _top_nav(label: str | None = None, links: str = "") -> str:
     <a class="skip-link" href="#main">Skip to content</a>
     <nav class="navbar navbar-expand-sm sticky-top navbar-blur border-bottom" aria-label="Main navigation">
       <div class="container">
-        <a class="navbar-brand brand" href="/"><img src="/logo.svg" alt="" width="28" height="28">router-dyndns</a>
+        <a class="navbar-brand brand" href="/"><img src="/logo.png" alt="" width="28" height="28">KarlDNS</a>
         <div class="navbar-nav ms-auto flex-row align-items-center gap-2 gap-sm-3">
           {links}
           {account_html}
@@ -806,7 +802,7 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
           <div>
             <p class="eyebrow">Direct custom-domain publishing</p>
             <h2>Verify DNS ownership</h2>
-            <p class="section-copy">Use this only when RouterPulse should publish A/AAAA records directly inside your domain. If you just want your own subdomain, generate a hostname above and create a CNAME to it.</p>
+            <p class="section-copy">Use this only when KarlDNS should publish A/AAAA records directly inside your domain. If you just want your own subdomain, generate a hostname above and create a CNAME to it.</p>
           </div>
         </div>
         <div class="row g-3 mt-4">
@@ -924,7 +920,7 @@ def _manual_update_panel(commands: str) -> str:
         <div class="card card-body gap-3 mt-4">
           <div>
             <h3>Manual updates</h3>
-            <p class="section-copy">FRITZ!Box replaces <code>&lt;ipaddr&gt;</code> and <code>&lt;ip6addr&gt;</code>, then sends a GET request to the Update-URL. Scripts and other routers can do the same with curl. If no IP parameter is sent, RouterPulse uses the request source IP.</p>
+            <p class="section-copy">FRITZ!Box replaces <code>&lt;ipaddr&gt;</code> and <code>&lt;ip6addr&gt;</code>, then sends a GET request to the Update-URL. Scripts and other routers can do the same with curl. If no IP parameter is sent, KarlDNS uses the request source IP.</p>
           </div>
           <pre class="manual-code mb-0"><code>{safe_commands}</code></pre>
           {_copy_button("Copy curl examples", commands)}
@@ -1316,7 +1312,6 @@ def _page(title: str, body: str) -> str:
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{html.escape(title)}</title>
         <link rel="icon" href="/favicon.ico" sizes="any">
-        <link rel="icon" href="/logo.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/logo.png">
         <script src="/app.js" defer></script>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">

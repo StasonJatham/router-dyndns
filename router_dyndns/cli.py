@@ -6,7 +6,7 @@ from .ddns import DdnsSettings, make_app
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="router-dyndns")
+    parser = argparse.ArgumentParser(prog="karldns")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     render_url = subparsers.add_parser("render-fritz-url", help="Render a FRITZ!Box custom DynDNS update URL.")

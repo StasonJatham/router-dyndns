@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "router-dyndns"
+name = "karldns"
 version = "0.1.0"
 description = "A small self-hosted DynDNS service for FRITZ!Box and compatible routers."
 readme = "README.md"
@@ -39,6 +39,7 @@ dev = [
 ]
 
 [project.scripts]
+karldns = "router_dyndns.cli:main"
 router-dyndns = "router_dyndns.cli:main"
 
 [tool.hatch.build.targets.wheel]
