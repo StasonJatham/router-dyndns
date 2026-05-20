@@ -85,6 +85,92 @@ document.addEventListener("click", async (event) => {
     }, 1200);
   } catch (_) {}
 });
+
+document.querySelectorAll("[data-admin-table]").forEach((tableShell) => {
+  const table = tableShell.querySelector("table");
+  const tbody = tableShell.querySelector("tbody");
+  const search = tableShell.querySelector("[data-table-search]");
+  const pageSize = tableShell.querySelector("[data-table-page-size]");
+  const count = tableShell.querySelector("[data-table-count]");
+  const pagination = tableShell.querySelector("[data-table-pagination]");
+  if (!table || !tbody || !search || !pageSize || !count || !pagination) return;
+
+  const headerCount = table.querySelectorAll("thead th").length || 1;
+  const originalRows = Array.from(tbody.querySelectorAll("tr"));
+  const dataRows = originalRows.filter((row) => !row.classList.contains("empty-row"));
+  let currentPage = 1;
+
+  const emptyRow = (message) => {
+    const row = document.createElement("tr");
+    row.className = "empty-row";
+    const cell = document.createElement("td");
+    cell.className = "empty";
+    cell.colSpan = headerCount;
+    cell.textContent = message;
+    row.append(cell);
+    return row;
+  };
+
+  const visibleRows = () => {
+    const query = search.value.trim().toLowerCase();
+    if (!query) return dataRows;
+    return dataRows.filter((row) => row.textContent.toLowerCase().includes(query));
+  };
+
+  const renderButton = (label, page, disabled = false, active = false) => {
+    const item = document.createElement("li");
+    item.className = `page-item${disabled ? " disabled" : ""}${active ? " active" : ""}`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "page-link";
+    button.textContent = label;
+    button.disabled = disabled;
+    button.addEventListener("click", () => {
+      currentPage = page;
+      render();
+    });
+    item.append(button);
+    return item;
+  };
+
+  const renderPagination = (totalPages) => {
+    pagination.replaceChildren();
+    if (totalPages <= 1) return;
+    pagination.append(renderButton("Previous", Math.max(1, currentPage - 1), currentPage === 1));
+    for (let page = 1; page <= totalPages; page += 1) {
+      if (totalPages > 7 && page !== 1 && page !== totalPages && Math.abs(page - currentPage) > 1) {
+        if (page === 2 || page === totalPages - 1) pagination.append(renderButton("...", currentPage, true));
+        continue;
+      }
+      pagination.append(renderButton(String(page), page, false, page === currentPage));
+    }
+    pagination.append(renderButton("Next", Math.min(totalPages, currentPage + 1), currentPage === totalPages));
+  };
+
+  const render = () => {
+    const rows = visibleRows();
+    const size = Number.parseInt(pageSize.value, 10) || 25;
+    const totalPages = Math.max(1, Math.ceil(rows.length / size));
+    currentPage = Math.min(currentPage, totalPages);
+    const start = (currentPage - 1) * size;
+    const pageRows = rows.slice(start, start + size);
+    tbody.replaceChildren(...(pageRows.length ? pageRows : [emptyRow(dataRows.length ? "No matching rows." : "No rows yet.")]));
+    const shownStart = rows.length ? start + 1 : 0;
+    const shownEnd = rows.length ? Math.min(start + size, rows.length) : 0;
+    count.textContent = `${shownStart}-${shownEnd} of ${rows.length}`;
+    renderPagination(totalPages);
+  };
+
+  search.addEventListener("input", () => {
+    currentPage = 1;
+    render();
+  });
+  pageSize.addEventListener("change", () => {
+    currentPage = 1;
+    render();
+  });
+  render();
+});
 """.strip()
 
 
@@ -883,16 +969,16 @@ def _render_admin_page(
 ) -> str:
     csrf = html.escape(admin_csrf_token(settings))
     rows = "\n".join(_account_row(account, csrf=csrf) for account in accounts) or """
-      <tr><td colspan="7" class="empty">No hostnames yet.</td></tr>
+      <tr class="empty-row"><td colspan="7" class="empty">No hostnames yet.</td></tr>
     """
     domain_rows = "\n".join(_domain_claim_row(challenge) for challenge in domain_challenges) or """
-      <tr><td colspan="4" class="empty">No domain claims yet.</td></tr>
+      <tr class="empty-row"><td colspan="4" class="empty">No domain claims yet.</td></tr>
     """
     cleanup_rows = "\n".join(_cleanup_row(run) for run in cleanup_runs) or """
-      <tr><td colspan="3" class="empty">No cleanup runs yet.</td></tr>
+      <tr class="empty-row"><td colspan="3" class="empty">No cleanup runs yet.</td></tr>
     """
     event_rows = "\n".join(_event_row(event) for event in update_events) or """
-      <tr><td colspan="6" class="empty">No update events yet.</td></tr>
+      <tr class="empty-row"><td colspan="6" class="empty">No update events yet.</td></tr>
     """
     return _page(
         "DynDNS Admin",
@@ -933,7 +1019,8 @@ def _render_admin_page(
                   <h2>Active credentials</h2>
                 </div>
               </div>
-              <div class="table-responsive border rounded">
+              {_admin_table_toolbar("hostnames", "Search hostnames")}
+              <div class="table-responsive border rounded admin-table-scroll">
                 <table class="table mb-0">
                   <thead>
                     <tr><th>Domain</th><th>User</th><th>IPv4</th><th>IPv6</th><th>Updated</th><th>Links</th><th></th></tr>
@@ -941,6 +1028,7 @@ def _render_admin_page(
                   <tbody>{rows}</tbody>
                 </table>
               </div>
+              {_admin_table_pagination()}
             </div>
           </section>
 
@@ -952,12 +1040,14 @@ def _render_admin_page(
                   <h2>Verification lifecycle</h2>
                 </div>
               </div>
-              <div class="table-responsive border rounded">
+              {_admin_table_toolbar("domain-claims", "Search domain claims")}
+              <div class="table-responsive border rounded admin-table-scroll">
                 <table class="table mb-0">
                   <thead><tr><th>Domain</th><th>Status</th><th>Created</th><th>Verified</th></tr></thead>
                   <tbody>{domain_rows}</tbody>
                 </table>
               </div>
+              {_admin_table_pagination()}
             </div>
           </section>
 
@@ -969,12 +1059,14 @@ def _render_admin_page(
                   <h2>Recent runs</h2>
                 </div>
               </div>
-              <div class="table-responsive border rounded">
+              {_admin_table_toolbar("cleanup-runs", "Search cleanup runs")}
+              <div class="table-responsive border rounded admin-table-scroll">
                 <table class="table mb-0">
                   <thead><tr><th>Time</th><th>Domain claims removed</th><th>Unused hostnames removed</th></tr></thead>
                   <tbody>{cleanup_rows}</tbody>
                 </table>
               </div>
+              {_admin_table_pagination()}
             </div>
           </section>
 
@@ -986,12 +1078,14 @@ def _render_admin_page(
                   <h2>Recent events</h2>
                 </div>
               </div>
-              <div class="table-responsive border rounded">
+              {_admin_table_toolbar("update-events", "Search update events")}
+              <div class="table-responsive border rounded admin-table-scroll">
                 <table class="table mb-0">
                   <thead><tr><th>Time</th><th>Domain</th><th>Status</th><th>IPv4</th><th>IPv6</th><th>Detail</th></tr></thead>
                   <tbody>{event_rows}</tbody>
                 </table>
               </div>
+              {_admin_table_pagination()}
             </div>
           </section>
         </main>
@@ -1025,6 +1119,39 @@ def _account_row(account: dict[str, str | int | None], csrf: str = "") -> str:
           </form>
         </td>
       </tr>
+    """
+
+
+def _admin_table_toolbar(table_id: str, search_label: str) -> str:
+    safe_id = html.escape(table_id)
+    safe_label = html.escape(search_label)
+    return f"""
+      <div class="admin-table-shell mt-3" data-admin-table>
+        <div class="d-flex align-items-center justify-content-between gap-3 flex-column flex-md-row mb-3">
+          <label class="w-100 mb-0" for="{safe_id}-search">
+            <span class="visually-hidden">{safe_label}</span>
+            <input id="{safe_id}-search" class="form-control" type="search" placeholder="{safe_label}" data-table-search autocomplete="off">
+          </label>
+          <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <span class="small text-secondary text-nowrap" data-table-count>0-0 of 0</span>
+            <label class="visually-hidden" for="{safe_id}-page-size">Rows per page</label>
+            <select id="{safe_id}-page-size" class="form-select form-select-sm table-page-size" data-table-page-size>
+              <option value="10">10</option>
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+        </div>
+    """
+
+
+def _admin_table_pagination() -> str:
+    return """
+        <nav class="mt-3" aria-label="Table pagination">
+          <ul class="pagination pagination-sm justify-content-end mb-0" data-table-pagination></ul>
+        </nav>
+      </div>
     """
 
 
@@ -1158,6 +1285,9 @@ def _page(title: str, body: str) -> str:
           .copy-field .input-group-text {{ min-width: 150px; color: var(--rp-muted); font-size: 13px; }}
           .copy-field code {{ min-height: 44px; margin: 0; color: var(--rp-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.6; background: var(--bs-body-bg); }}
           .section-dark .copy-field code {{ color: #f5f5f7; background: #1d1d1f; }}
+          .admin-table-scroll {{ max-height: 560px; overflow: auto; }}
+          .admin-table-scroll thead th {{ position: sticky; top: 0; z-index: 1; background: var(--rp-surface); }}
+          .table-page-size {{ width: auto; min-width: 76px; }}
           table {{ width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--rp-ink); }}
           th, td {{ border-bottom: 1px solid var(--rp-soft-line); padding: 14px 10px; text-align: left; white-space: nowrap; }}
           tr:last-child th, tr:last-child td {{ border-bottom: 0; }}

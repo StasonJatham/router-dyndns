@@ -166,6 +166,11 @@ def test_admin_page_shows_operator_views_without_create_form(tmp_path: Path) -> 
     assert "Operator console" in response.text
     assert "Generate credentials" not in response.text
     assert 'action="/admin/accounts"' not in response.text
+    assert response.text.count("data-admin-table") == 4
+    assert response.text.count("data-table-search") == 4
+    assert response.text.count("data-table-page-size") == 4
+    assert response.text.count("data-table-pagination") == 4
+    assert "admin-table-scroll" in response.text
     assert "Scheduled cleanup" in response.text
     assert "Active credentials" in response.text
     assert "Domain claims" in response.text
