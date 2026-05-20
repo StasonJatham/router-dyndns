@@ -577,6 +577,25 @@ def test_public_home_hides_admin_link_and_uses_automatic_router_login(tmp_path: 
     assert "generates the hostname, secret update URL, and optional router compatibility credentials automatically" in response.text
 
 
+def test_public_home_examples_use_configured_public_base_url(tmp_path: Path) -> None:
+    app = make_app(
+        DdnsSettings(
+            database_path=tmp_path / "ddns.sqlite3",
+            admin_password="admin",
+            hostname_suffix="karldns.de",
+            public_base_url="https://karldns.de",
+        )
+    )
+    client = TestClient(app)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "https://karldns.de/u/&lt;secret&gt;" in response.text
+    assert "http://127.0.0.1" not in response.text
+    assert "http://localhost" not in response.text
+
+
 def test_application_pages_use_stricter_script_csp(tmp_path: Path) -> None:
     app = make_app(DdnsSettings(database_path=tmp_path / "ddns.sqlite3", admin_password="admin"))
     client = TestClient(app)
