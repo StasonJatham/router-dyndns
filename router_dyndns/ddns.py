@@ -155,7 +155,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
         response.headers["Referrer-Policy"] = "same-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; script-src 'unsafe-inline' 'self'; style-src 'unsafe-inline' 'self'; form-action 'self'; frame-ancestors 'none'"
+            "default-src 'self'; script-src 'unsafe-inline' 'self'; style-src 'unsafe-inline' 'self' https://cdn.jsdelivr.net; form-action 'self'; frame-ancestors 'none'"
         )
         if settings.public_base_url.startswith("https://"):
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
@@ -249,7 +249,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
                       <p class="eyebrow">Deleted</p>
                       <h1>Hostname deleted.</h1>
                       <p class="lead">The update URL no longer works.</p>
-                      <a class="button secondary" href="/">Home</a>
+                      <a class="btn btn-outline-primary rounded-pill" href="/">Home</a>
                     </div>
                   </section>
                 </main>
@@ -540,8 +540,8 @@ def _render_public_home(
               <h1>DynDNS without signups.</h1>
               <p class="lead">Create a secure update endpoint under {suffix}. Provider hostnames are anonymous; custom domains require DNS proof.</p>
               <div class="hero-actions">
-                <a class="button" href="#create">Get a hostname</a>
-                <a class="button secondary" href="#custom-domain">Verify a domain</a>
+                <a class="btn btn-primary rounded-pill" href="#create">Get a hostname</a>
+                <a class="btn btn-outline-primary rounded-pill" href="#custom-domain">Verify a domain</a>
               </div>
             </div>
           </section>
@@ -556,10 +556,10 @@ def _render_public_home(
               </div>
               <form method="post" action="/magic" class="tool-card" aria-label="Create a generated DynDNS hostname">
                 <label>Router username
-                  <input name="username" placeholder="optional" autocomplete="off" inputmode="text">
+                  <input class="form-control" name="username" placeholder="optional" autocomplete="off" inputmode="text">
                   <span class="field-hint">Leave empty to generate one automatically.</span>
                 </label>
-                <button type="submit">Generate hostname</button>
+                <button type="submit" class="btn btn-primary rounded-pill">Generate hostname</button>
               </form>
             </div>
           </section>
@@ -586,7 +586,7 @@ def _top_nav(label: str | None = None, links: str = "") -> str:
     <a class="skip-link" href="#main">Skip to content</a>
     <nav class="top-nav" aria-label="Main navigation">
       <div class="container nav-inner">
-        <a class="brand" href="/"><img src="/logo.svg" alt="" width="28" height="28">router-dyndns</a>
+        <a class="navbar-brand brand" href="/"><img src="/logo.svg" alt="" width="28" height="28">router-dyndns</a>
         <div class="nav-actions">
           {links}
           {account_html}
@@ -617,7 +617,7 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
           <form method="post" action="/verify-domain" class="inline-form" aria-label="Check DNS TXT verification">
             <input type="hidden" name="domain" value="{domain}">
             <input type="hidden" name="claim_secret" value="{claim_secret}">
-            <button type="submit">Check DNS record</button>
+            <button type="submit" class="btn btn-primary rounded-pill">Check DNS record</button>
           </form>
         </div>
         """
@@ -630,13 +630,13 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
                 <input type="hidden" name="mode" value="custom">
                 <input type="hidden" name="claim_secret" value="{claim_secret}">
                 <label>Verified hostname
-                  <input name="hostname" placeholder="home.example.com" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+                  <input class="form-control" name="hostname" placeholder="home.example.com" autocomplete="off" autocapitalize="none" spellcheck="false" required>
                 </label>
                 <label>Router username
-                  <input name="username" placeholder="optional" autocomplete="off">
+                  <input class="form-control" name="username" placeholder="optional" autocomplete="off">
                   <span class="field-hint">Leave empty to generate one automatically.</span>
                 </label>
-                <button type="submit">Create credentials</button>
+                <button type="submit" class="btn btn-primary rounded-pill">Create credentials</button>
               </form>
             </div>
             """
@@ -665,9 +665,9 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
             <h3>Enter domain</h3>
             <form method="post" action="/request-domain" class="stack-form" aria-label="Request a custom domain TXT challenge">
               <label>Domain
-                <input name="domain" placeholder="example.com" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+                <input class="form-control" name="domain" placeholder="example.com" autocomplete="off" autocapitalize="none" spellcheck="false" required>
               </label>
-              <button type="submit">Create TXT challenge</button>
+              <button type="submit" class="btn btn-primary rounded-pill">Create TXT challenge</button>
             </form>
           </div>
           {challenge_html}
@@ -730,7 +730,7 @@ def _copy_row(label: str, value: str) -> str:
     <div class="copy-row">
       <span>{safe_label}</span>
       <code>{safe_value}</code>
-      <button type="button" class="copy-button" data-copy="{safe_value}" aria-label="Copy {safe_label}">Copy</button>
+      <button type="button" class="btn btn-sm btn-light copy-button" data-copy="{safe_value}" aria-label="Copy {safe_label}">Copy</button>
     </div>
     """
 
@@ -769,7 +769,7 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
               <p class="eyebrow">Magic management</p>
               <h1>{hostname}</h1>
               <p class="lead">Anyone with this link can manage or delete this hostname. Keep it private.</p>
-              <a class="button secondary" href="/">Back home</a>
+              <a class="btn btn-outline-primary rounded-pill" href="/">Back home</a>
             </div>
           </section>
           <section class="section">
@@ -793,7 +793,7 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
                 <p class="eyebrow">Current address</p>
                 <h2>Status</h2>
               </div>
-              <table class="status-table">
+              <table class="table status-table">
                 <tbody>
                   <tr><th>IPv4</th><td>{ipv4}</td></tr>
                   <tr><th>IPv6</th><td>{ipv6}</td></tr>
@@ -810,7 +810,7 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
                 <p class="section-copy">This removes the hostname and DNS records. The router update URL will stop working.</p>
               </div>
               <form method="post" action="/m/{html.escape(management_slug)}/delete">
-                <button class="danger-button" type="submit">Delete hostname</button>
+                <button class="btn btn-outline-danger rounded-pill danger-button" type="submit">Delete hostname</button>
               </form>
             </div>
           </section>
@@ -872,7 +872,7 @@ def _render_admin_page(
               </div>
               <form method="post" action="/admin/cleanup" class="tool-card" aria-label="Run cleanup now">
                 <input type="hidden" name="csrf" value="{csrf}">
-                <button type="submit">Run cleanup now</button>
+                <button type="submit" class="btn btn-primary rounded-pill">Run cleanup now</button>
               </form>
             </div>
           </section>
@@ -888,13 +888,13 @@ def _render_admin_page(
               <form method="post" action="/admin/accounts" class="tool-card" aria-label="Create router credentials">
                 <input type="hidden" name="csrf" value="{csrf}">
                 <label>Domainnamen
-                  <input name="hostname" placeholder="home.example.net" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+                  <input class="form-control" name="hostname" placeholder="home.example.net" autocomplete="off" autocapitalize="none" spellcheck="false" required>
                 </label>
                 <label>Benutzername
-                  <input name="username" placeholder="auto-generated" autocomplete="off">
+                  <input class="form-control" name="username" placeholder="auto-generated" autocomplete="off">
                   <span class="field-hint">Leave empty to generate one from the hostname.</span>
                 </label>
-                <button type="submit">Generate credentials</button>
+                <button type="submit" class="btn btn-primary rounded-pill">Generate credentials</button>
               </form>
             </div>
           </section>
@@ -908,7 +908,7 @@ def _render_admin_page(
                 </div>
               </div>
               <div class="table-wrap">
-                <table>
+                <table class="table">
                   <thead>
                     <tr><th>Domain</th><th>User</th><th>IPv4</th><th>IPv6</th><th>Updated</th><th>Links</th><th></th></tr>
                   </thead>
@@ -927,7 +927,7 @@ def _render_admin_page(
                 </div>
               </div>
               <div class="table-wrap">
-                <table>
+                <table class="table">
                   <thead><tr><th>Domain</th><th>Status</th><th>Created</th><th>Verified</th></tr></thead>
                   <tbody>{domain_rows}</tbody>
                 </table>
@@ -944,7 +944,7 @@ def _render_admin_page(
                 </div>
               </div>
               <div class="table-wrap">
-                <table>
+                <table class="table">
                   <thead><tr><th>Time</th><th>Domain claims removed</th><th>Unused hostnames removed</th></tr></thead>
                   <tbody>{cleanup_rows}</tbody>
                 </table>
@@ -961,7 +961,7 @@ def _render_admin_page(
                 </div>
               </div>
               <div class="table-wrap">
-                <table>
+                <table class="table">
                   <thead><tr><th>Time</th><th>Domain</th><th>Status</th><th>IPv4</th><th>IPv6</th><th>Detail</th></tr></thead>
                   <tbody>{event_rows}</tbody>
                 </table>
@@ -986,16 +986,16 @@ def _account_row(account: dict[str, str | int | None], csrf: str = "") -> str:
           <form method="post" action="/admin/accounts/rotate" class="table-actions">
             <input type="hidden" name="csrf" value="{html.escape(csrf)}">
             <input type="hidden" name="hostname" value="{hostname}">
-            <button name="action" value="update" class="small-button" title="Rotate update URL" aria-label="Rotate update URL for {hostname}">Update URL</button>
-            <button name="action" value="management" class="small-button" title="Rotate management link" aria-label="Rotate management link for {hostname}">Manage link</button>
-            <button name="action" value="password" class="small-button" title="Rotate router password" aria-label="Rotate router password for {hostname}">Password</button>
+            <button name="action" value="update" class="btn btn-sm btn-light small-button" title="Rotate update URL" aria-label="Rotate update URL for {hostname}">Update URL</button>
+            <button name="action" value="management" class="btn btn-sm btn-light small-button" title="Rotate management link" aria-label="Rotate management link for {hostname}">Manage link</button>
+            <button name="action" value="password" class="btn btn-sm btn-light small-button" title="Rotate router password" aria-label="Rotate router password for {hostname}">Password</button>
           </form>
         </td>
         <td>
           <form method="post" action="/admin/accounts/delete">
             <input type="hidden" name="csrf" value="{html.escape(csrf)}">
             <input type="hidden" name="hostname" value="{hostname}">
-            <button class="icon-button" title="Delete hostname" aria-label="Delete {hostname}">x</button>
+            <button class="btn btn-sm btn-light icon-button" title="Delete hostname" aria-label="Delete {hostname}">x</button>
           </form>
         </td>
       </tr>
@@ -1038,52 +1038,85 @@ def _page(title: str, body: str) -> str:
         <link rel="icon" href="/favicon.ico" sizes="any">
         <link rel="icon" href="/logo.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/logo.png">
+        <script>
+          (() => {{
+            const applyTheme = () => {{
+              const theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+              document.documentElement.setAttribute("data-bs-theme", theme);
+              document.documentElement.style.colorScheme = theme;
+            }};
+            applyTheme();
+            window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+          }})();
+        </script>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
         <style>
           :root {{
-            color-scheme: light;
-            --bg: #f5f5f7;
-            --surface: #ffffff;
-            --ink: #1d1d1f;
-            --muted: #6e6e73;
-            --line: #d2d2d7;
-            --soft-line: rgba(0, 0, 0, 0.08);
-            --blue: #0071e3;
-            --blue-hover: #0077ed;
-            --dark: #161617;
-            --dark-2: #1d1d1f;
-            --danger: #b42318;
+            --bs-primary: #0071e3;
+            --bs-primary-rgb: 0, 113, 227;
+            --bs-link-color: #0071e3;
+            --bs-link-hover-color: #005bb8;
+            --rp-bg: #f5f5f7;
+            --rp-surface: #ffffff;
+            --rp-surface-alt: #fafafc;
+            --rp-ink: #1d1d1f;
+            --rp-muted: #6e6e73;
+            --rp-line: rgba(0, 0, 0, 0.1);
+            --rp-soft-line: rgba(0, 0, 0, 0.06);
+            --rp-dark: #161617;
+            --rp-dark-card: #242426;
+            --rp-danger: #b42318;
+            --rp-nav-bg: rgba(245, 245, 247, 0.86);
+          }}
+          [data-bs-theme="dark"] {{
+            --bs-body-bg: #0f1012;
+            --bs-body-color: #f5f5f7;
+            --bs-secondary-color: #a1a1aa;
+            --bs-border-color: rgba(255, 255, 255, 0.16);
+            --bs-tertiary-bg: #1c1d20;
+            --rp-bg: #0f1012;
+            --rp-surface: #16171a;
+            --rp-surface-alt: #1c1d20;
+            --rp-ink: #f5f5f7;
+            --rp-muted: #a1a1aa;
+            --rp-line: rgba(255, 255, 255, 0.16);
+            --rp-soft-line: rgba(255, 255, 255, 0.1);
+            --rp-dark: #050506;
+            --rp-dark-card: #16171a;
+            --rp-danger: #ff8a80;
+            --rp-nav-bg: rgba(15, 16, 18, 0.82);
           }}
           * {{ box-sizing: border-box; }}
           html {{ scroll-behavior: smooth; }}
           body {{
-            margin: 0;
             min-height: 100vh;
-            background: var(--bg);
-            color: var(--ink);
+            background: var(--rp-bg);
+            color: var(--rp-ink);
             font: 400 16px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
           }}
           .container {{ width: min(1040px, calc(100% - 40px)); margin: 0 auto; }}
-          .skip-link {{ position: fixed; left: 16px; top: 10px; z-index: 40; transform: translateY(-140%); padding: 10px 14px; border-radius: 999px; background: var(--ink); color: #fff; text-decoration: none; font-size: 14px; transition: transform .16s ease; }}
+          .skip-link {{ position: fixed; left: 16px; top: 10px; z-index: 40; transform: translateY(-140%); padding: 10px 14px; border-radius: 999px; background: var(--rp-ink); color: var(--rp-bg); text-decoration: none; font-size: 14px; transition: transform .16s ease; }}
           .skip-link:focus {{ transform: translateY(0); }}
-          .top-nav {{ position: sticky; top: 0; z-index: 20; min-height: 52px; display: flex; align-items: center; background: rgba(245, 245, 247, 0.86); border-bottom: 1px solid rgba(0, 0, 0, 0.08); backdrop-filter: saturate(180%) blur(20px); }}
+          .top-nav {{ position: sticky; top: 0; z-index: 20; min-height: 52px; display: flex; align-items: center; background: var(--rp-nav-bg); border-bottom: 1px solid var(--rp-soft-line); backdrop-filter: saturate(180%) blur(20px); }}
           .nav-inner {{ min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }}
-          .brand {{ display: inline-flex; align-items: center; gap: 9px; color: var(--ink); font-size: 15px; font-weight: 650; letter-spacing: -0.01em; text-decoration: none; white-space: nowrap; }}
+          .brand {{ display: inline-flex; align-items: center; gap: 9px; color: var(--rp-ink); font-size: 15px; font-weight: 650; letter-spacing: -0.01em; text-decoration: none; white-space: nowrap; }}
+          .brand:hover {{ color: var(--rp-ink); }}
           .brand img {{ width: 28px; height: 28px; display: block; }}
           .nav-actions {{ min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 14px; }}
-          .nav-actions a:not(.nav-button) {{ color: var(--muted); font-size: 13px; text-decoration: none; white-space: nowrap; }}
-          .nav-actions a:not(.nav-button):hover {{ color: var(--ink); }}
-          .nav-label {{ min-width: 0; max-width: 38vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 13px; }}
-          .nav-button {{ min-height: 34px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: #e8e8ed; color: var(--ink); font: inherit; font-size: 13px; font-weight: 500; text-decoration: none; cursor: pointer; }}
-          .nav-button:hover {{ background: #dedee3; }}
-          .hero-band {{ min-height: calc(70vh - 52px); display: grid; align-items: center; background: var(--bg); text-align: center; padding: 80px 0 72px; }}
+          .nav-actions a:not(.nav-button) {{ color: var(--rp-muted); font-size: 13px; text-decoration: none; white-space: nowrap; }}
+          .nav-actions a:not(.nav-button):hover {{ color: var(--rp-ink); }}
+          .nav-label {{ min-width: 0; max-width: 38vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rp-muted); font-size: 13px; }}
+          .nav-button {{ min-height: 34px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--rp-line); border-radius: 999px; background: var(--rp-surface-alt); color: var(--rp-ink); font: inherit; font-size: 13px; font-weight: 500; text-decoration: none; cursor: pointer; }}
+          .nav-button:hover {{ background: var(--bs-tertiary-bg); color: var(--rp-ink); }}
+          .hero-band {{ min-height: calc(70vh - 52px); display: grid; align-items: center; background: var(--rp-bg); text-align: center; padding: 80px 0 72px; }}
           .hero-band.compact {{ min-height: 360px; }}
           .hero-inner {{ display: grid; justify-items: center; gap: 18px; }}
-          .section {{ padding: 68px 0; background: var(--surface); }}
-          .section + .section {{ border-top: 1px solid rgba(0, 0, 0, 0.04); }}
-          .section-dark {{ background: var(--dark); color: #f5f5f7; border-top: 0; }}
-          .success-section {{ background: #f5f5f7; }}
-          .danger-section {{ background: #fff; border-top: 1px solid var(--soft-line); }}
-          .message-band {{ background: #fff8e6; color: var(--ink); padding: 18px 0; border-block: 1px solid #f0cc74; }}
+          .section {{ padding: 68px 0; background: var(--rp-surface); }}
+          .section + .section {{ border-top: 1px solid var(--rp-soft-line); }}
+          .section-dark {{ background: var(--rp-dark); color: #f5f5f7; border-top: 0; }}
+          .success-section {{ background: var(--rp-bg); }}
+          .danger-section {{ background: var(--rp-surface); border-top: 1px solid var(--rp-soft-line); }}
+          .message-band {{ background: var(--bs-warning-bg-subtle); color: var(--rp-ink); padding: 18px 0; border-block: 1px solid var(--bs-warning-border-subtle); }}
           .split-row, .section-heading {{ display: flex; align-items: center; justify-content: space-between; gap: 24px; }}
           .page-heading, .admin-heading .container {{ max-width: 760px; }}
           .button-row {{ display: flex; gap: 10px; flex-wrap: wrap; }}
@@ -1091,58 +1124,50 @@ def _page(title: str, body: str) -> str:
           h1 {{ max-width: 760px; font-size: 48px; line-height: 1.08; font-weight: 650; letter-spacing: -0.02em; }}
           h2 {{ font-size: 28px; line-height: 1.16; font-weight: 600; letter-spacing: -0.015em; }}
           h3 {{ font-size: 18px; line-height: 1.25; font-weight: 600; }}
-          .eyebrow {{ color: var(--blue); font-size: 13px; font-weight: 600; letter-spacing: 0; }}
-          .lead {{ max-width: 660px; color: var(--muted); font-size: 19px; line-height: 1.47; letter-spacing: -0.01em; }}
+          .eyebrow {{ color: var(--bs-primary); font-size: 13px; font-weight: 600; letter-spacing: 0; }}
+          .lead {{ max-width: 660px; color: var(--rp-muted); font-size: 19px; line-height: 1.47; letter-spacing: -0.01em; }}
           .section-dark .lead, .section-dark .section-copy, .section-dark .note {{ color: #cccccc; }}
-          .section-copy, .intro {{ margin-top: 12px; max-width: 560px; color: var(--muted); font-size: 15px; line-height: 1.5; }}
+          .section-copy, .intro {{ margin-top: 12px; max-width: 560px; color: var(--rp-muted); font-size: 15px; line-height: 1.5; }}
           .hero-actions {{ display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }}
           .tool-grid {{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 440px); gap: 40px; align-items: start; }}
-          .tool-card, .step-card, .secondary-card {{ display: grid; gap: 16px; padding: 24px; background: var(--surface); border: 1px solid var(--soft-line); border-radius: 8px; }}
-          .secondary-card {{ background: #fafafc; }}
-          .section-dark .step-card {{ background: #242426; border-color: rgba(255, 255, 255, 0.12); }}
+          .tool-card, .step-card, .secondary-card {{ display: grid; gap: 16px; padding: 24px; background: var(--rp-surface); border: 1px solid var(--rp-line); border-radius: .75rem; }}
+          .secondary-card {{ background: var(--rp-surface-alt); }}
+          .section-dark .step-card {{ background: var(--rp-dark-card); border-color: rgba(255, 255, 255, 0.14); }}
           .section-dark .muted-card {{ opacity: .66; }}
           .step-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 28px; }}
           .stack-form {{ display: grid; gap: 16px; }}
           .inline-form {{ margin-top: 14px; }}
-          label {{ display: grid; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 500; }}
-          input {{ width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; color: var(--ink); font: inherit; background: #fff; outline: none; }}
-          input:focus {{ border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.16); }}
-          .field-hint {{ color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.35; }}
-          button, .button {{ min-height: 44px; border: 0; border-radius: 999px; padding: 0 20px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--blue); color: #fff; font: inherit; font-size: 15px; font-weight: 500; text-decoration: none; cursor: pointer; transition: background .16s ease, transform .16s ease; }}
-          button:hover, .button:hover {{ background: var(--blue-hover); }}
-          button:active, .button:active {{ transform: scale(.97); }}
-          button:focus-visible, .button:focus-visible, a:focus-visible, input:focus-visible {{ outline: 2px solid var(--blue); outline-offset: 3px; }}
-          .secondary {{ background: #e8e8ed; color: var(--ink); }}
-          .secondary:hover {{ background: #dedee3; }}
-          .secondary-on-dark {{ background: transparent; color: #f5f5f7; border: 1px solid rgba(255, 255, 255, 0.36); }}
-          .secondary-on-dark:hover {{ background: rgba(255, 255, 255, 0.12); }}
-          .danger-button {{ background: transparent; color: var(--danger); border: 1px solid rgba(180, 35, 24, 0.28); }}
-          .danger-button:hover {{ background: #fff1f0; }}
-          .note {{ margin-top: 10px; color: var(--muted); font-size: 13px; line-height: 1.45; }}
+          label {{ display: grid; gap: 8px; color: var(--rp-muted); font-size: 13px; font-weight: 500; }}
+          input {{ width: 100%; min-height: 44px; border: 1px solid var(--bs-border-color); border-radius: .5rem; padding: 10px 12px; color: var(--bs-body-color); font: inherit; background: var(--bs-body-bg); outline: none; }}
+          input:focus {{ border-color: var(--bs-primary); box-shadow: 0 0 0 .25rem rgba(var(--bs-primary-rgb), .16); }}
+          .field-hint {{ color: var(--rp-muted); font-size: 12px; font-weight: 400; line-height: 1.35; }}
+          .btn {{ min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; font-weight: 500; transition: background-color .16s ease, border-color .16s ease, transform .16s ease; }}
+          .btn:active {{ transform: scale(.97); }}
+          .btn:focus-visible, a:focus-visible, input:focus-visible {{ outline: 2px solid var(--bs-primary); outline-offset: 3px; }}
+          .btn-light {{ --bs-btn-bg: var(--rp-surface-alt); --bs-btn-border-color: var(--rp-line); --bs-btn-color: var(--rp-ink); --bs-btn-hover-bg: var(--bs-tertiary-bg); --bs-btn-hover-border-color: var(--rp-line); --bs-btn-hover-color: var(--rp-ink); }}
+          .danger-button {{ color: var(--rp-danger); }}
+          .note {{ margin-top: 10px; color: var(--rp-muted); font-size: 13px; line-height: 1.45; }}
           .copy-list {{ display: grid; gap: 10px; }}
-          .copy-row {{ display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 48px; padding: 10px 10px 10px 14px; background: #fff; border: 1px solid var(--soft-line); border-radius: 8px; }}
-          .copy-row span {{ color: var(--muted); font-size: 13px; }}
-          .copy-row code {{ min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }}
-          .copy-button {{ min-height: 32px; padding: 0 12px; border-radius: 999px; background: #f5f5f7; color: var(--blue); font-size: 13px; }}
-          .copy-button:hover {{ background: #e8e8ed; }}
+          .copy-row {{ display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 48px; padding: 10px 10px 10px 14px; background: var(--rp-surface); border: 1px solid var(--rp-line); border-radius: .5rem; }}
+          .copy-row span {{ color: var(--rp-muted); font-size: 13px; }}
+          .copy-row code {{ min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rp-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }}
+          .copy-button {{ min-height: 32px; padding: 0 12px; border-radius: 999px; color: var(--bs-primary); font-size: 13px; }}
           .section-dark .copy-row {{ background: #1d1d1f; border-color: rgba(255, 255, 255, 0.14); }}
           .section-dark .copy-row code {{ color: #f5f5f7; }}
-          .step-number {{ width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: var(--blue); color: white; border-radius: 50%; font-size: 13px; }}
-          .table-wrap {{ overflow-x: auto; border: 1px solid var(--soft-line); border-radius: 8px; }}
-          table {{ width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }}
-          th, td {{ border-bottom: 1px solid var(--soft-line); padding: 14px 10px; text-align: left; white-space: nowrap; }}
+          .step-number {{ width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: var(--bs-primary); color: white; border-radius: 50%; font-size: 13px; }}
+          .table-wrap {{ overflow-x: auto; border: 1px solid var(--rp-line); border-radius: .5rem; }}
+          table {{ width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--rp-ink); }}
+          th, td {{ border-bottom: 1px solid var(--rp-soft-line); padding: 14px 10px; text-align: left; white-space: nowrap; }}
           tr:last-child th, tr:last-child td {{ border-bottom: 0; }}
-          th {{ color: var(--muted); font-size: 12px; font-weight: 600; }}
-          .empty {{ color: var(--muted); text-align: center; padding: 28px; }}
-          .icon-button {{ width: 32px; min-height: 32px; padding: 0; background: #f5f5f7; color: var(--danger); }}
-          .icon-button:hover {{ background: #fff1f0; }}
+          th {{ color: var(--rp-muted); font-size: 12px; font-weight: 600; }}
+          .empty {{ color: var(--rp-muted); text-align: center; padding: 28px; }}
+          .icon-button {{ width: 32px; min-height: 32px; padding: 0; color: var(--rp-danger); }}
           .table-actions {{ display: flex; gap: 6px; flex-wrap: wrap; }}
-          .small-button {{ min-height: 32px; padding: 0 11px; background: #f5f5f7; color: var(--blue); font-size: 12px; }}
-          .small-button:hover {{ background: #e8e8ed; }}
-          .footer {{ padding: 28px 0; background: var(--bg); border-top: 1px solid var(--soft-line); }}
+          .small-button {{ min-height: 32px; padding: 0 11px; color: var(--bs-primary); font-size: 12px; }}
+          .footer {{ padding: 28px 0; background: var(--rp-bg); border-top: 1px solid var(--rp-soft-line); }}
           .footer-links {{ display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; }}
-          .footer-links a {{ color: var(--muted); font-size: 13px; text-decoration: none; }}
-          .footer-links a:hover {{ color: var(--ink); }}
+          .footer-links a {{ color: var(--rp-muted); font-size: 13px; text-decoration: none; }}
+          .footer-links a:hover {{ color: var(--rp-ink); }}
           @media (max-width: 860px) {{
             .tool-grid, .step-grid {{ grid-template-columns: 1fr; }}
             .split-row, .section-heading {{ align-items: flex-start; flex-direction: column; }}
@@ -1159,7 +1184,7 @@ def _page(title: str, body: str) -> str:
             .brand {{ font-size: 14px; }}
             .brand img {{ width: 24px; height: 24px; }}
             .hero-actions, .button-row {{ width: 100%; flex-direction: column; }}
-            .hero-actions .button, .tool-card button, .step-card button, .danger-button {{ width: 100%; }}
+            .hero-actions .btn, .tool-card button, .step-card button, .danger-button {{ width: 100%; }}
             .tool-card, .step-card, .secondary-card {{ padding: 18px; }}
             .copy-row {{ grid-template-columns: 1fr; }}
             .copy-row code {{ white-space: normal; overflow-wrap: anywhere; }}
