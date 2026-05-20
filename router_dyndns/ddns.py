@@ -421,6 +421,7 @@ def _render_public_home(
         "router-dyndns",
         f"""
         <main>
+          {_top_nav()}
           <section class="hero-band">
             <div class="container hero-inner">
               <p class="eyebrow">FRITZ!Box compatible</p>
@@ -454,9 +455,9 @@ def _render_public_home(
               <div>
                 <p class="eyebrow">Custom domains</p>
                 <h2>Use your own domain after TXT verification.</h2>
-                <p class="section-copy">Sign in to prove ownership and create hostnames below verified DNS zones.</p>
+                <p class="section-copy">Enter your domain, add the TXT record we show you, then press the check button. We verify public DNS before credentials are issued.</p>
               </div>
-              <a class="button secondary-on-dark" href="/login">Sign in or register</a>
+              <a class="button secondary-on-dark" href="/login">Set up domain</a>
             </div>
           </section>
           <footer class="footer">
@@ -489,17 +490,12 @@ def _render_user_home(
         "router-dyndns dashboard",
         f"""
         <main>
-          <section class="subnav">
-            <div class="container toolbar">
-              <strong>{html.escape(str(user["email"]))}</strong>
-              <form method="post" action="/logout"><button class="button secondary" type="submit">Logout</button></form>
-            </div>
-          </section>
+          {_top_nav(str(user["email"]), True)}
           <section class="section">
             <div class="container page-heading">
               <p class="eyebrow">Dashboard</p>
               <h1>Your router hostnames</h1>
-              <p class="lead">Create provider hostnames immediately or verify a custom domain with DNS before issuing credentials.</p>
+              <p class="lead">Create provider hostnames immediately, or add a domain and verify it with a DNS TXT record.</p>
             </div>
           </section>
           {message_html}
@@ -552,11 +548,12 @@ def _render_auth_page(settings: DdnsSettings, message: str | None) -> str:
         "Sign in",
         f"""
         <main>
+          {_top_nav()}
           <section class="hero-band compact">
             <div class="container hero-inner">
               <p class="eyebrow">Custom domains</p>
-              <h1>Sign in to verify domains.</h1>
-              <p class="lead">Provider-owned hostnames are anonymous. Custom domains need an account so TXT claims and quotas stay scoped to you.</p>
+              <h1>Set up a verified domain.</h1>
+              <p class="lead">Create a small private workspace, enter your domain, add the TXT record we generate, then check public DNS.</p>
             </div>
           </section>
           {_message_band(message) if message else ""}
@@ -600,6 +597,27 @@ def _render_public_page(
     return _render_auth_page(settings, message)
 
 
+def _top_nav(label: str | None = None, show_logout: bool = False, links: str = "") -> str:
+    account_html = ""
+    if label:
+        account_html = f'<span class="nav-label">{html.escape(label)}</span>'
+    if show_logout:
+        account_html += '<form method="post" action="/logout"><button class="nav-button" type="submit">Logout</button></form>'
+    elif not links:
+        account_html += '<a class="nav-button" href="/login">Domain setup</a>'
+    return f"""
+    <nav class="top-nav">
+      <div class="container nav-inner">
+        <a class="brand" href="/">router-dyndns</a>
+        <div class="nav-actions">
+          {links}
+          {account_html}
+        </div>
+      </div>
+    </nav>
+    """
+
+
 def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] | None, message: str | None) -> str:
     challenge_html = ""
     create_form = ""
@@ -608,18 +626,18 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
         token = str(challenge["token"])
         claim_secret = html.escape(str(challenge.get("claim_secret") or ""))
         verification_name = service.verification_name(str(challenge["domain"]))
-        status = html.escape(message or "Add this TXT record, then verify.")
+        status = html.escape(message or "Add this TXT record at your DNS provider, then press the check button.")
         challenge_html = f"""
         <div class="step-card">
           <span class="step-number">2</span>
-          <h3>Add TXT record</h3>
+          <h3>Add the TXT record</h3>
           <p class="note">{status}</p>
           {_copy_row("TXT name", verification_name)}
           {_copy_row("TXT value", token)}
           <form method="post" action="/verify-domain" class="inline-form">
             <input type="hidden" name="domain" value="{domain}">
             <input type="hidden" name="claim_secret" value="{claim_secret}">
-            <button type="submit">Verify DNS</button>
+            <button type="submit">I added it, check DNS</button>
           </form>
         </div>
         """
@@ -627,7 +645,7 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
             create_form = f"""
             <div class="step-card">
               <span class="step-number">3</span>
-              <h3>Create hostname</h3>
+              <h3>Create router hostname</h3>
               <form method="post" action="/accounts" class="stack-form">
                 <input type="hidden" name="mode" value="custom">
                 <input type="hidden" name="claim_secret" value="{claim_secret}">
@@ -645,8 +663,8 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
             create_form = """
             <div class="step-card muted-card">
               <span class="step-number">3</span>
-              <h3>Create hostname</h3>
-              <p class="note">Credentials unlock after the TXT record verifies.</p>
+              <h3>Create router hostname</h3>
+              <p class="note">This unlocks after the TXT record is visible in public DNS.</p>
             </div>
             """
 
@@ -656,19 +674,19 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
         <div class="section-heading">
           <div>
             <p class="eyebrow">Custom domain</p>
-            <h2>Verify ownership before issuing credentials.</h2>
-            <p class="section-copy">The hostname must be inside a DNS zone this service can publish.</p>
+            <h2>Enter domain, add TXT, check DNS.</h2>
+            <p class="section-copy">We only issue router credentials after the DNS record proves you control the domain.</p>
           </div>
         </div>
         <div class="step-grid">
           <div class="step-card">
             <span class="step-number">1</span>
-            <h3>Add domain</h3>
+            <h3>Enter domain</h3>
             <form method="post" action="/request-domain" class="stack-form">
-              <label>Domain to verify
+              <label>Domain
                 <input name="domain" placeholder="example.com" required>
               </label>
-              <button type="submit">Create TXT challenge</button>
+              <button type="submit">Generate TXT record</button>
             </form>
           </div>
           {challenge_html}
@@ -753,6 +771,7 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
         "DynDNS management",
         f"""
         <main>
+          {_top_nav()}
           <section class="hero-band compact">
             <div class="container hero-inner">
               <p class="eyebrow">Magic management</p>
@@ -831,15 +850,7 @@ def _render_admin_page(
         "DynDNS Admin",
         f"""
         <main>
-          <section class="subnav">
-            <div class="container toolbar">
-              <strong>Operator console</strong>
-              <div class="button-row">
-                <a class="button secondary" href="/records">Records JSON</a>
-                <a class="button secondary" href="/events">Events JSON</a>
-              </div>
-            </div>
-          </section>
+          {_top_nav("Operator console", False, '<a href="/records">Records</a><a href="/events">Events</a>')}
           <section class="section admin-heading">
             <div class="container">
               <p class="eyebrow">DynDNS aktiv</p>
@@ -976,7 +987,16 @@ def _page(title: str, body: str) -> str:
             font: 400 16px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
           }}
           .container {{ width: min(1040px, calc(100% - 40px)); margin: 0 auto; }}
-          .hero-band {{ min-height: 74vh; display: grid; align-items: center; background: var(--bg); text-align: center; padding: 84px 0; }}
+          .top-nav {{ position: sticky; top: 0; z-index: 20; min-height: 52px; display: flex; align-items: center; background: rgba(245, 245, 247, 0.86); border-bottom: 1px solid rgba(0, 0, 0, 0.08); backdrop-filter: saturate(180%) blur(20px); }}
+          .nav-inner {{ min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }}
+          .brand {{ color: var(--ink); font-size: 15px; font-weight: 650; letter-spacing: -0.01em; text-decoration: none; white-space: nowrap; }}
+          .nav-actions {{ min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 14px; }}
+          .nav-actions a:not(.nav-button) {{ color: var(--muted); font-size: 13px; text-decoration: none; white-space: nowrap; }}
+          .nav-actions a:not(.nav-button):hover {{ color: var(--ink); }}
+          .nav-label {{ min-width: 0; max-width: 38vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 13px; }}
+          .nav-button {{ min-height: 34px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: #e8e8ed; color: var(--ink); font: inherit; font-size: 13px; font-weight: 500; text-decoration: none; cursor: pointer; }}
+          .nav-button:hover {{ background: #dedee3; }}
+          .hero-band {{ min-height: calc(74vh - 52px); display: grid; align-items: center; background: var(--bg); text-align: center; padding: 84px 0; }}
           .hero-band.compact {{ min-height: 420px; }}
           .hero-inner {{ display: grid; justify-items: center; gap: 18px; }}
           .section {{ padding: 72px 0; background: var(--surface); }}
@@ -985,8 +1005,7 @@ def _page(title: str, body: str) -> str:
           .success-section {{ background: #f5f5f7; }}
           .danger-section {{ background: #fff; border-top: 1px solid var(--soft-line); }}
           .message-band {{ background: #fff8e6; color: var(--ink); padding: 18px 0; border-block: 1px solid #f0cc74; }}
-          .subnav {{ position: sticky; top: 0; z-index: 10; min-height: 52px; display: flex; align-items: center; background: rgba(245, 245, 247, 0.82); border-bottom: 1px solid rgba(0, 0, 0, 0.08); backdrop-filter: saturate(180%) blur(20px); }}
-          .toolbar, .split-row, .section-heading {{ display: flex; align-items: center; justify-content: space-between; gap: 24px; }}
+          .split-row, .section-heading {{ display: flex; align-items: center; justify-content: space-between; gap: 24px; }}
           .page-heading, .admin-heading .container {{ max-width: 760px; }}
           .button-row {{ display: flex; gap: 10px; flex-wrap: wrap; }}
           h1, h2, h3, p {{ margin: 0; }}
@@ -1036,13 +1055,16 @@ def _page(title: str, body: str) -> str:
           .icon-button:hover {{ background: #fff1f0; }}
           @media (max-width: 860px) {{
             .tool-grid, .auth-grid, .step-grid {{ grid-template-columns: 1fr; }}
-            .toolbar, .split-row, .section-heading {{ align-items: flex-start; flex-direction: column; }}
+            .split-row, .section-heading {{ align-items: flex-start; flex-direction: column; }}
             .section, .hero-band {{ padding: 52px 0; }}
             h1 {{ font-size: 36px; }}
             .lead {{ font-size: 17px; }}
           }}
           @media (max-width: 560px) {{
             .container {{ width: min(100% - 28px, 1040px); }}
+            .nav-inner {{ gap: 10px; }}
+            .nav-actions {{ gap: 8px; }}
+            .nav-label {{ display: none; }}
             .copy-row {{ grid-template-columns: 1fr; }}
             .copy-button {{ width: max-content; }}
             h1 {{ font-size: 31px; }}
