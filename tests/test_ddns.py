@@ -466,6 +466,8 @@ def test_api_docs_include_versioned_ddns_api(tmp_path: Path) -> None:
     assert docs.status_code == 200
     assert redoc.status_code == 200
     assert "unsafe-inline" in docs.headers["content-security-policy"]
+    assert "fonts.googleapis.com" in redoc.headers["content-security-policy"]
+    assert "fonts.gstatic.com" in redoc.headers["content-security-policy"]
     assert "/api/v1/hostnames/magic" in schema["paths"]
     assert "/api/v1/updates/{update_slug}" in schema["paths"]
     assert "/admin" not in schema["paths"]
@@ -473,6 +475,24 @@ def test_api_docs_include_versioned_ddns_api(tmp_path: Path) -> None:
     assert "/events" not in schema["paths"]
     assert any(tag["name"] == "hostnames" for tag in schema["tags"])
     assert all(tag["name"] != "admin" for tag in schema["tags"])
+
+
+def test_public_home_hides_admin_link_and_explains_router_login(tmp_path: Path) -> None:
+    app = make_app(
+        DdnsSettings(
+            database_path=tmp_path / "ddns.sqlite3",
+            admin_password="admin",
+            hostname_suffix="ddns.example.net",
+        )
+    )
+    client = TestClient(app)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert 'href="/admin"' not in response.text
+    assert "Router login name" in response.text
+    assert "FRITZ!Box Benutzername" in response.text
 
 
 def test_application_pages_use_stricter_script_csp(tmp_path: Path) -> None:

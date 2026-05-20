@@ -610,9 +610,9 @@ def _content_security_policy(path: str) -> str:
         return (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
             "img-src 'self' data: https://fastapi.tiangolo.com; "
-            "font-src 'self' https://cdn.jsdelivr.net; "
+            "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
             "connect-src 'self'; "
             "form-action 'self'; "
             "frame-ancestors 'none'"
@@ -667,9 +667,9 @@ def _render_public_home(
                 <p class="section-copy">Generate a random hostname, paste the update URL into your router, and keep the private status page. Your own DNS name can point to this hostname with a CNAME.</p>
               </div>
               <form method="post" action="/magic" class="col-lg-5 card card-body gap-3" aria-label="Create a generated DynDNS hostname">
-                <label>Router username
+                <label>Router login name <span class="text-secondary fw-normal">(optional)</span>
                   <input class="form-control" name="username" placeholder="optional" autocomplete="off" inputmode="text">
-                  <span class="form-text m-0">Leave empty to generate one automatically.</span>
+                  <span class="form-text m-0">This becomes the FRITZ!Box Benutzername. Leave empty to generate one automatically.</span>
                 </label>
                 <button type="submit" class="btn btn-primary rounded-pill">Generate hostname</button>
               </form>
@@ -681,7 +681,6 @@ def _render_public_home(
             <div class="container nav justify-content-center gap-3">
               <a class="nav-link p-0 small text-secondary" href="/docs">API docs</a>
               <a class="nav-link p-0 small text-secondary" href="/redoc">ReDoc</a>
-              <a class="nav-link p-0 small text-secondary" href="/admin">Admin</a>
             </div>
           </footer>
         </main>
@@ -751,9 +750,9 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
                 <label>Verified hostname
                   <input class="form-control" name="hostname" placeholder="home.example.com" autocomplete="off" autocapitalize="none" spellcheck="false" required>
                 </label>
-                <label>Router username
+                <label>Router login name <span class="text-secondary fw-normal">(optional)</span>
                   <input class="form-control" name="username" placeholder="optional" autocomplete="off">
-                  <span class="form-text m-0">Leave empty to generate one automatically.</span>
+                  <span class="form-text m-0">This becomes the FRITZ!Box Benutzername. Leave empty to generate one automatically.</span>
                 </label>
                 <button type="submit" class="btn btn-primary rounded-pill">Create credentials</button>
               </form>
@@ -1262,21 +1261,22 @@ def _page(title: str, body: str) -> str:
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
         <style>
           :root {{
-            --bs-primary: #0071e3;
-            --bs-primary-rgb: 0, 113, 227;
-            --bs-link-color: #0071e3;
-            --bs-link-hover-color: #005bb8;
-            --rp-bg: #f5f5f7;
+            --bs-primary: #088a5b;
+            --bs-primary-rgb: 8, 138, 91;
+            --bs-link-color: #088a5b;
+            --bs-link-hover-color: #066b47;
+            --rp-bg: #f6f8f6;
             --rp-surface: #ffffff;
-            --rp-surface-alt: #fafafc;
-            --rp-ink: #1d1d1f;
-            --rp-muted: #6e6e73;
+            --rp-surface-alt: #f0f5f2;
+            --rp-ink: #18211d;
+            --rp-muted: #637067;
             --rp-line: rgba(0, 0, 0, 0.1);
             --rp-soft-line: rgba(0, 0, 0, 0.06);
-            --rp-dark: #161617;
-            --rp-dark-card: #242426;
+            --rp-dark: #111816;
+            --rp-dark-card: #1a2521;
             --rp-danger: #b42318;
-            --rp-nav-bg: rgba(245, 245, 247, 0.86);
+            --rp-nav-bg: rgba(246, 248, 246, 0.88);
+            --rp-shadow: 0 18px 48px rgba(24, 33, 29, 0.08);
           }}
           [data-bs-theme="dark"] {{
             --bs-body-bg: #0f1012;
@@ -1286,7 +1286,7 @@ def _page(title: str, body: str) -> str:
             --bs-tertiary-bg: #1c1d20;
             --rp-bg: #0f1012;
             --rp-surface: #16171a;
-            --rp-surface-alt: #1c1d20;
+            --rp-surface-alt: #1b231f;
             --rp-ink: #f5f5f7;
             --rp-muted: #a1a1aa;
             --rp-line: rgba(255, 255, 255, 0.16);
@@ -1295,6 +1295,7 @@ def _page(title: str, body: str) -> str:
             --rp-dark-card: #16171a;
             --rp-danger: #ff8a80;
             --rp-nav-bg: rgba(15, 16, 18, 0.82);
+            --rp-shadow: none;
           }}
           * {{ box-sizing: border-box; }}
           html {{ scroll-behavior: smooth; }}
@@ -1307,13 +1308,13 @@ def _page(title: str, body: str) -> str:
           .container {{ max-width: 1040px; }}
           .skip-link {{ position: fixed; left: 16px; top: 10px; z-index: 40; transform: translateY(-140%); padding: 10px 14px; border-radius: 999px; background: var(--rp-ink); color: var(--rp-bg); text-decoration: none; font-size: 14px; transition: transform .16s ease; }}
           .skip-link:focus {{ transform: translateY(0); }}
-          .navbar-blur {{ min-height: 52px; background: var(--rp-nav-bg); backdrop-filter: saturate(180%) blur(20px); }}
+          .navbar-blur {{ min-height: 56px; background: var(--rp-nav-bg); backdrop-filter: saturate(180%) blur(20px); }}
           .brand {{ display: inline-flex; align-items: center; gap: 9px; color: var(--rp-ink); font-size: 15px; font-weight: 650; letter-spacing: -0.01em; white-space: nowrap; }}
           .brand:hover {{ color: var(--rp-ink); }}
           .brand img {{ width: 28px; height: 28px; display: block; }}
           .navbar .nav-link, .navbar-text {{ color: var(--rp-muted); font-size: 13px; }}
           .navbar .nav-link:hover {{ color: var(--rp-ink); }}
-          .hero-band {{ min-height: calc(70vh - 52px); display: grid; align-items: center; background: var(--rp-bg); text-align: center; padding: 80px 0 72px; }}
+          .hero-band {{ min-height: calc(70vh - 56px); display: grid; align-items: center; background: var(--rp-bg); text-align: center; padding: 88px 0 76px; }}
           .hero-band.compact {{ min-height: 360px; }}
           .section {{ padding: 68px 0; background: var(--rp-surface); }}
           .section + .section {{ border-top: 1px solid var(--rp-soft-line); }}
@@ -1322,20 +1323,20 @@ def _page(title: str, body: str) -> str:
           .danger-section {{ background: var(--rp-surface); border-top: 1px solid var(--rp-soft-line); }}
           .page-heading, .admin-heading .container {{ max-width: 760px; }}
           h1, h2, h3, p {{ margin: 0; }}
-          h1 {{ max-width: 760px; font-size: 48px; line-height: 1.08; font-weight: 650; letter-spacing: -0.02em; }}
+          h1 {{ max-width: 760px; font-size: 52px; line-height: 1.06; font-weight: 700; letter-spacing: -0.02em; }}
           h2 {{ font-size: 28px; line-height: 1.16; font-weight: 600; letter-spacing: -0.015em; }}
           h3 {{ font-size: 18px; line-height: 1.25; font-weight: 600; }}
-          .eyebrow {{ color: var(--bs-primary); font-size: 13px; font-weight: 600; letter-spacing: 0; }}
+          .eyebrow {{ color: var(--bs-primary); font-size: 13px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }}
           .lead {{ max-width: 660px; color: var(--rp-muted); font-size: 19px; line-height: 1.47; letter-spacing: -0.01em; }}
           .section-dark .lead, .section-dark .section-copy {{ color: #cccccc; }}
           .section-dark .text-secondary {{ color: #cccccc !important; }}
           .section-copy, .intro {{ margin-top: 12px; max-width: 560px; color: var(--rp-muted); font-size: 15px; line-height: 1.5; }}
-          .card {{ background: var(--rp-surface); border-color: var(--rp-line); border-radius: .75rem; }}
+          .card {{ background: var(--rp-surface); border-color: var(--rp-line); border-radius: 1rem; box-shadow: var(--rp-shadow); }}
           .section-dark .card {{ background: var(--rp-dark-card); border-color: rgba(255, 255, 255, 0.14); color: #f5f5f7; }}
-          label {{ display: grid; gap: 8px; color: var(--rp-muted); font-size: 13px; font-weight: 500; }}
-          input {{ width: 100%; min-height: 44px; border: 1px solid var(--bs-border-color); border-radius: .5rem; padding: 10px 12px; color: var(--bs-body-color); font: inherit; background: var(--bs-body-bg); outline: none; }}
+          label {{ display: grid; gap: 8px; color: var(--rp-muted); font-size: 13px; font-weight: 600; }}
+          input {{ width: 100%; min-height: 46px; border: 1px solid var(--bs-border-color); border-radius: .75rem; padding: 10px 13px; color: var(--bs-body-color); font: inherit; background: var(--bs-body-bg); outline: none; }}
           input:focus {{ border-color: var(--bs-primary); box-shadow: 0 0 0 .25rem rgba(var(--bs-primary-rgb), .16); }}
-          .btn {{ display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 500; transition: background-color .16s ease, border-color .16s ease, transform .16s ease; }}
+          .btn {{ display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 650; transition: background-color .16s ease, border-color .16s ease, transform .16s ease; }}
           .btn:not(.btn-sm) {{ min-height: 44px; font-size: 15px; }}
           .btn-sm {{ min-height: 32px; }}
           .btn:active {{ transform: scale(.97); }}
