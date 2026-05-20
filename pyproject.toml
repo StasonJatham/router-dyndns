@@ -8,12 +8,28 @@ version = "0.1.0"
 description = "A small self-hosted DynDNS service for FRITZ!Box and compatible routers."
 readme = "README.md"
 requires-python = ">=3.11"
+keywords = [
+  "ddns",
+  "dyndns",
+  "dynamic-dns",
+  "self-hosted",
+  "fritzbox",
+  "cloudflare-ddns",
+  "rfc2136",
+  "homelab",
+  "fastapi",
+]
 dependencies = [
   "dnspython>=2.6",
   "fastapi>=0.111",
   "pydantic>=2.7",
   "uvicorn[standard]>=0.30",
 ]
+
+[project.urls]
+Homepage = "https://github.com/StasonJatham/router-dyndns"
+Repository = "https://github.com/StasonJatham/router-dyndns"
+Issues = "https://github.com/StasonJatham/router-dyndns/issues"
 
 [project.optional-dependencies]
 dev = [
