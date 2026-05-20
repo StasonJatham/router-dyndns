@@ -100,7 +100,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
         response.headers["Referrer-Policy"] = "same-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; style-src 'unsafe-inline' 'self'; form-action 'self'; frame-ancestors 'none'"
+            "default-src 'self'; script-src 'unsafe-inline' 'self'; style-src 'unsafe-inline' 'self'; form-action 'self'; frame-ancestors 'none'"
         )
         if settings.public_base_url.startswith("https://"):
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
@@ -154,15 +154,22 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
             return PlainTextResponse("911 dns publish failed", status_code=500)
 
     @app.get("/", response_class=HTMLResponse)
-    def index() -> str:
-        return _render_magic_page(service, settings, None, None)
+    def index(request: Request) -> str:
+        user = current_user(request)
+        if user:
+            return _render_user_home(service, settings, user, store.list_accounts(int(user["id"])), None, None, None)
+        return _render_public_home(service, settings, None, None)
+
+    @app.get("/login", response_class=HTMLResponse)
+    def login_page() -> str:
+        return _render_auth_page(settings, None)
 
     @app.post("/magic", response_class=HTMLResponse)
     async def magic_account(request: Request) -> str:
         form = _parse_form(await request.body())
         username = _first_form_value(form, "username") or None
         account = await run_in_threadpool(service.create_managed_account, username, None)
-        return _render_magic_page(service, settings, account, None)
+        return _render_public_home(service, settings, account, None)
 
     @app.get("/m/{management_slug}", response_class=HTMLResponse)
     def manage_magic(management_slug: str) -> str:
@@ -184,7 +191,18 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
         return HTMLResponse(
             _page(
                 "DynDNS deleted",
-                '<main class="shell"><section class="panel"><h1>Hostname deleted</h1><p class="note">The update URL no longer works.</p></section></main>',
+                """
+                <main>
+                  <section class="hero-band compact">
+                    <div class="container hero-inner">
+                      <p class="eyebrow">Deleted</p>
+                      <h1>Hostname deleted.</h1>
+                      <p class="lead">The update URL no longer works.</p>
+                      <a class="button secondary" href="/">Home</a>
+                    </div>
+                  </section>
+                </main>
+                """,
             )
         )
 
@@ -198,7 +216,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
             challenge = await run_in_threadpool(service.create_domain_challenge, _first_form_value(form, "domain"), int(user["id"]))
         except sqlite3.IntegrityError as exc:
             raise HTTPException(status_code=409, detail="domain is already verified") from exc
-        return _render_magic_page(service, settings, None, None, challenge)
+        return _render_user_home(service, settings, user, store.list_accounts(int(user["id"])), None, None, challenge)
 
     @app.post("/verify-domain", response_class=HTMLResponse)
     async def verify_domain(request: Request) -> str:
@@ -210,8 +228,16 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
         claim_secret = _first_form_value(form, "claim_secret")
         found, challenge = await run_in_threadpool(service.verify_domain, domain, claim_secret, int(user["id"]))
         if not found:
-            return _render_magic_page(service, settings, None, "TXT record not found yet. DNS propagation can take a few minutes.", challenge)
-        return _render_magic_page(service, settings, None, "Domain verified. You can now create a hostname under it.", challenge)
+            return _render_user_home(
+                service,
+                settings,
+                user,
+                store.list_accounts(int(user["id"])),
+                None,
+                "TXT record not found yet. DNS propagation can take a few minutes.",
+                challenge,
+            )
+        return _render_user_home(service, settings, user, store.list_accounts(int(user["id"])), None, "Domain verified. You can now create a hostname under it.", challenge)
 
     @app.post("/accounts", response_class=HTMLResponse)
     async def self_service_account(request: Request) -> str:
@@ -232,7 +258,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
                 username,
                 int(user["id"]),
             )
-        return _render_magic_page(service, settings, account, None)
+        return _render_user_home(service, settings, user, store.list_accounts(int(user["id"])), account, None, None)
 
     @app.post("/register")
     async def register(request: Request) -> Response:
@@ -241,12 +267,12 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
         password = _first_form_value(form, "password")
         invite = _first_form_value(form, "invite")
         if not email or len(password) < 12:
-            return HTMLResponse(_render_public_page(service, settings, None, [], None, "Use a valid email and a password with at least 12 characters."))
+            return HTMLResponse(_render_auth_page(settings, "Use a valid email and a password with at least 12 characters."))
         try:
             user = await run_in_threadpool(store.create_user, email, password, invite, settings.require_invite)
         except (sqlite3.IntegrityError, ValueError):
             return HTMLResponse(
-                _render_public_page(service, settings, None, [], None, "Registration failed. Check the invite code and email address."),
+                _render_auth_page(settings, "Registration failed. Check the invite code and email address."),
                 status_code=400,
             )
         response = RedirectResponse("/", status_code=303)
@@ -258,7 +284,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
         form = _parse_form(await request.body())
         user = await run_in_threadpool(store.authenticate_user, normalize_email(_first_form_value(form, "email")), _first_form_value(form, "password"))
         if not user:
-            return HTMLResponse(_render_public_page(service, settings, None, [], None, "Login failed."), status_code=401)
+            return HTMLResponse(_render_auth_page(settings, "Login failed."), status_code=401)
         response = RedirectResponse("/", status_code=303)
         set_session_cookie(response, settings, int(user["id"]))
         return response
@@ -378,93 +404,182 @@ def _render_magic_page(
     message: str | None,
     challenge: dict[str, str | None] | None = None,
 ) -> str:
-    suffix = html.escape(settings.hostname_suffix or "your DynDNS domain")
-    created_html = _created_account_panel(service, created_account)
-    challenge_html = _challenge_panel(service, challenge, message)
-    message_html = f'<section class="panel warning-panel"><p>{html.escape(message)}</p></section>' if message and not challenge else ""
-    managed_html = ""
-    if settings.hostname_suffix:
-        managed_html = """
-        <section class="panel">
-          <h2>Free DynDNS hostname</h2>
-          <form method="post" action="/magic" class="account-form">
-            <label>Benutzername
-              <input name="username" placeholder="optional">
-            </label>
-            <button type="submit">Generate secure URLs</button>
-          </form>
-          <p class="note">No account needed. You will receive a random hostname, a router update URL, and a separate magic management link. Keep the management link private.</p>
-        </section>
-        """
+    return _render_public_home(service, settings, created_account, message, challenge)
 
+
+def _render_public_home(
+    service: DdnsService,
+    settings: DdnsSettings,
+    created_account: dict[str, str] | None,
+    message: str | None,
+    challenge: dict[str, str | None] | None = None,
+) -> str:
+    suffix = html.escape(settings.hostname_suffix or "your DynDNS domain")
+    created_html = _credentials_panel(service, created_account)
+    message_html = _message_band(message) if message and not challenge else ""
     return _page(
-        "DynDNS",
+        "router-dyndns",
         f"""
-        <main class="shell">
-          <section class="hero">
-            <div>
+        <main>
+          <section class="hero-band">
+            <div class="container hero-inner">
               <p class="eyebrow">FRITZ!Box compatible</p>
-              <h1>Free DynDNS for {suffix}</h1>
-              <p class="lead">Generate cryptographically random URLs, paste the update URL into your router, and keep the management link somewhere safe.</p>
+              <h1>DynDNS without the account ceremony.</h1>
+              <p class="lead">Create a secure update endpoint under {suffix}. Provider hostnames are anonymous; custom domains require DNS proof.</p>
+              <div class="hero-actions">
+                <a class="button" href="#create">Create hostname</a>
+                <a class="button secondary" href="/login">Use custom domain</a>
+              </div>
             </div>
-            <a class="button secondary" href="/admin">Admin</a>
           </section>
           {message_html}
           {created_html}
-          {managed_html}
-          {challenge_html}
+          <section class="section" id="create">
+            <div class="container tool-grid">
+              <div>
+                <p class="eyebrow">Free DynDNS hostname</p>
+                <h2>Create a router update URL</h2>
+                <p class="section-copy">Generate a random hostname, paste the update URL into your router, and keep the management link private.</p>
+              </div>
+              <form method="post" action="/magic" class="tool-card">
+                <label>Username
+                  <input name="username" placeholder="optional">
+                </label>
+                <button type="submit">Create hostname</button>
+              </form>
+            </div>
+          </section>
+          <section class="section section-dark">
+            <div class="container split-row">
+              <div>
+                <p class="eyebrow">Custom domains</p>
+                <h2>Use your own domain after TXT verification.</h2>
+                <p class="section-copy">Sign in to prove ownership and create hostnames below verified DNS zones.</p>
+              </div>
+              <a class="button secondary-on-dark" href="/login">Sign in or register</a>
+            </div>
+          </section>
+          <footer class="footer">
+            <div class="container footer-links">
+              <a href="/docs">API docs</a>
+              <a href="/redoc">ReDoc</a>
+              <a href="/admin">Admin</a>
+            </div>
+          </footer>
         </main>
         """,
     )
 
 
-def _render_management_page(service: DdnsService, settings: DdnsSettings, management_slug: str, account: dict[str, str | int | None]) -> str:
-    account_for_url = {
-        "hostname": str(account["hostname"]),
-        "username": str(account["username"]),
-        "password": "",
-        "update_slug": str(account["update_slug"]),
-        "management_slug": management_slug,
-    }
-    update_url = html.escape(service.fritz_update_url(account_for_url))
-    hostname = html.escape(str(account["hostname"]))
-    username = html.escape(str(account["username"]))
-    ipv4 = html.escape(str(account.get("ipv4") or "-"))
-    ipv6 = html.escape(str(account.get("ipv6") or "-"))
-    updated = html.escape(str(account.get("updated_at") or "Never"))
+def _render_user_home(
+    service: DdnsService,
+    settings: DdnsSettings,
+    user: dict[str, str | int],
+    accounts: list[dict[str, str | int | None]],
+    created_account: dict[str, str] | None,
+    message: str | None,
+    challenge: dict[str, str | None] | None = None,
+) -> str:
+    created_html = _credentials_panel(service, created_account)
+    message_html = _message_band(message) if message and not challenge else ""
+    account_rows = "\n".join(_account_row(account, show_owner=False) for account in accounts) or """
+      <tr><td colspan="6" class="empty">No hostnames yet.</td></tr>
+    """
     return _page(
-        "DynDNS management",
+        "router-dyndns dashboard",
         f"""
-        <main class="shell">
-          <section class="hero">
-            <div>
-              <p class="eyebrow">Magic management</p>
-              <h1>{hostname}</h1>
-              <p class="lead">Anyone with this link can manage this hostname. Keep it private.</p>
-            </div>
-            <a class="button secondary" href="/">Home</a>
-          </section>
-          <section class="panel">
-            <h2>FRITZ!Box fields</h2>
-            <div class="fritz-form">
-              <label>Update-URL:<input readonly value="{update_url}"></label>
-              <label>Domainnamen:<input readonly value="{hostname}"></label>
-              <label>Benutzername:<input readonly value="{username}"></label>
-              <label>Kennwort:<input readonly value="unchanged; only shown when generated"></label>
+        <main>
+          <section class="subnav">
+            <div class="container toolbar">
+              <strong>{html.escape(str(user["email"]))}</strong>
+              <form method="post" action="/logout"><button class="button secondary" type="submit">Logout</button></form>
             </div>
           </section>
-          <section class="panel">
-            <h2>Current IP</h2>
-            <table>
-              <tbody>
-                <tr><th>IPv4</th><td>{ipv4}</td></tr>
-                <tr><th>IPv6</th><td>{ipv6}</td></tr>
-                <tr><th>Updated</th><td>{updated}</td></tr>
-              </tbody>
-            </table>
-            <form method="post" action="/m/{html.escape(management_slug)}/delete" class="inline-form">
-              <button type="submit">Delete hostname</button>
-            </form>
+          <section class="section">
+            <div class="container page-heading">
+              <p class="eyebrow">Dashboard</p>
+              <h1>Your router hostnames</h1>
+              <p class="lead">Create provider hostnames immediately or verify a custom domain with DNS before issuing credentials.</p>
+            </div>
+          </section>
+          {message_html}
+          {created_html}
+          <section class="section">
+            <div class="container tool-grid">
+              <div>
+                <p class="eyebrow">Provider hostname</p>
+                <h2>Create a random hostname</h2>
+                <p class="section-copy">Best for simple FRITZ!Box setups. The hostname and update link are generated for you.</p>
+              </div>
+              <form method="post" action="/accounts" class="tool-card">
+                <input type="hidden" name="mode" value="managed">
+                <label>Username
+                  <input name="username" placeholder="optional">
+                </label>
+                <button type="submit">Create hostname</button>
+              </form>
+            </div>
+          </section>
+          {_custom_domain_flow(service, challenge, message)}
+          <section class="section">
+            <div class="container">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Inventory</p>
+                  <h2>Hostnames</h2>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Domain</th><th>User</th><th>IPv4</th><th>IPv6</th><th>Updated</th><th></th></tr></thead>
+                  <tbody>{account_rows}</tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </main>
+        """,
+    )
+
+
+def _render_auth_page(settings: DdnsSettings, message: str | None) -> str:
+    invite_field = """
+      <label>Invite code
+        <input name="invite" autocomplete="off" required>
+      </label>
+    """ if settings.require_invite else ""
+    return _page(
+        "Sign in",
+        f"""
+        <main>
+          <section class="hero-band compact">
+            <div class="container hero-inner">
+              <p class="eyebrow">Custom domains</p>
+              <h1>Sign in to verify domains.</h1>
+              <p class="lead">Provider-owned hostnames are anonymous. Custom domains need an account so TXT claims and quotas stay scoped to you.</p>
+            </div>
+          </section>
+          {_message_band(message) if message else ""}
+          <section class="section">
+            <div class="container auth-grid">
+              <div class="tool-card">
+                <h2>Login</h2>
+                <form method="post" action="/login" class="stack-form">
+                  <label>Email<input name="email" type="email" autocomplete="email" required></label>
+                  <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+                  <button type="submit">Login</button>
+                </form>
+              </div>
+              <div class="tool-card secondary-card">
+                <h2>Register</h2>
+                <form method="post" action="/register" class="stack-form">
+                  <label>Email<input name="email" type="email" autocomplete="email" required></label>
+                  <label>Password<input name="password" type="password" autocomplete="new-password" minlength="12" required></label>
+                  {invite_field}
+                  <button type="submit">Create account</button>
+                </form>
+              </div>
+            </div>
           </section>
         </main>
         """,
@@ -480,68 +595,27 @@ def _render_public_page(
     message: str | None,
     created_account: dict[str, str] | None = None,
 ) -> str:
-    suffix = html.escape(settings.hostname_suffix or "your domain")
-    message_html = f'<section class="panel warning-panel"><p>{html.escape(message)}</p></section>' if message else ""
-    if not user:
-        invite_field = """
-          <label>Invite code
-            <input name="invite" autocomplete="off" required>
-          </label>
-        """ if settings.require_invite else ""
-        return _page(
-            "DynDNS",
-            f"""
-            <main class="shell">
-              <section class="hero">
-                <div>
-                  <p class="eyebrow">FRITZ!Box compatible</p>
-                  <h1>Managed DynDNS for {suffix}</h1>
-                  <p class="lead">Create a secure update URL for your FRITZ!Box or router. Sign in to generate provider hostnames or verify your own domain with DNS.</p>
-                </div>
-                <a class="button" href="/admin">Admin</a>
-              </section>
-              {message_html}
-              <section class="panel auth-grid">
-                <div>
-                  <h2>Login</h2>
-                  <form method="post" action="/login" class="stack-form">
-                    <label>Email<input name="email" type="email" autocomplete="email" required></label>
-                    <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
-                    <button type="submit">Login</button>
-                  </form>
-                </div>
-                <div>
-                  <h2>Register</h2>
-                  <form method="post" action="/register" class="stack-form">
-                    <label>Email<input name="email" type="email" autocomplete="email" required></label>
-                    <label>Password<input name="password" type="password" autocomplete="new-password" minlength="12" required></label>
-                    {invite_field}
-                    <button type="submit">Create account</button>
-                  </form>
-                </div>
-              </section>
-            </main>
-            """,
-        )
-    return _render_magic_page(service, settings, created_account, message, challenge)
+    if user:
+        return _render_user_home(service, settings, user, accounts, created_account, message, challenge)
+    return _render_auth_page(settings, message)
 
 
-def _challenge_panel(service: DdnsService, challenge: dict[str, str | None] | None, message: str | None) -> str:
+def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] | None, message: str | None) -> str:
     challenge_html = ""
-    claim_secret = ""
+    create_form = ""
     if challenge:
         domain = html.escape(str(challenge["domain"]))
-        token = html.escape(str(challenge["token"]))
+        token = str(challenge["token"])
         claim_secret = html.escape(str(challenge.get("claim_secret") or ""))
-        verification_name = html.escape(service.verification_name(str(challenge["domain"])))
+        verification_name = service.verification_name(str(challenge["domain"]))
         status = html.escape(message or "Add this TXT record, then verify.")
         challenge_html = f"""
-        <div class="dns-challenge">
+        <div class="step-card">
+          <span class="step-number">2</span>
+          <h3>Add TXT record</h3>
           <p class="note">{status}</p>
-          <div class="fritz-form">
-            <label>TXT name<input readonly value="{verification_name}"></label>
-            <label>TXT value<input readonly value="{token}"></label>
-          </div>
+          {_copy_row("TXT name", verification_name)}
+          {_copy_row("TXT value", token)}
           <form method="post" action="/verify-domain" class="inline-form">
             <input type="hidden" name="domain" value="{domain}">
             <input type="hidden" name="claim_secret" value="{claim_secret}">
@@ -549,57 +623,189 @@ def _challenge_panel(service: DdnsService, challenge: dict[str, str | None] | No
           </form>
         </div>
         """
+        if challenge.get("verified_at"):
+            create_form = f"""
+            <div class="step-card">
+              <span class="step-number">3</span>
+              <h3>Create hostname</h3>
+              <form method="post" action="/accounts" class="stack-form">
+                <input type="hidden" name="mode" value="custom">
+                <input type="hidden" name="claim_secret" value="{claim_secret}">
+                <label>Verified hostname
+                  <input name="hostname" placeholder="home.example.com" required>
+                </label>
+                <label>Username
+                  <input name="username" placeholder="optional">
+                </label>
+                <button type="submit">Create credentials</button>
+              </form>
+            </div>
+            """
+        else:
+            create_form = """
+            <div class="step-card muted-card">
+              <span class="step-number">3</span>
+              <h3>Create hostname</h3>
+              <p class="note">Credentials unlock after the TXT record verifies.</p>
+            </div>
+            """
 
     return f"""
-    <section class="panel">
-      <h2>Custom domain</h2>
-      <form method="post" action="/request-domain" class="account-form">
-        <label>Domain to verify
-          <input name="domain" placeholder="example.com" required>
-        </label>
-        <button type="submit">Create TXT challenge</button>
-      </form>
-      {challenge_html}
-      <form method="post" action="/accounts" class="account-form stacked">
-        <input type="hidden" name="mode" value="custom">
-        <input type="hidden" name="claim_secret" value="{claim_secret}">
-        <label>Verified hostname
-          <input name="hostname" placeholder="home.example.com" required>
-        </label>
-        <label>Benutzername
-          <input name="username" placeholder="optional">
-        </label>
-        <button type="submit">Generate credentials</button>
-      </form>
-      <p class="note">The hostname must be inside a domain that has already passed TXT verification.</p>
+    <section class="section section-dark">
+      <div class="container">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Custom domain</p>
+            <h2>Verify ownership before issuing credentials.</h2>
+            <p class="section-copy">The hostname must be inside a DNS zone this service can publish.</p>
+          </div>
+        </div>
+        <div class="step-grid">
+          <div class="step-card">
+            <span class="step-number">1</span>
+            <h3>Add domain</h3>
+            <form method="post" action="/request-domain" class="stack-form">
+              <label>Domain to verify
+                <input name="domain" placeholder="example.com" required>
+              </label>
+              <button type="submit">Create TXT challenge</button>
+            </form>
+          </div>
+          {challenge_html}
+          {create_form}
+        </div>
+      </div>
+    </section>
+    """
+
+
+def _challenge_panel(service: DdnsService, challenge: dict[str, str | None] | None, message: str | None) -> str:
+    return _custom_domain_flow(service, challenge, message)
+
+
+def _credentials_panel(service: DdnsService, created_account: dict[str, str] | None) -> str:
+    if not created_account:
+        return ""
+    hostname = created_account["hostname"]
+    username = created_account["username"]
+    password = created_account["password"]
+    update_url = service.fritz_update_url(created_account)
+    management_url = service.magic_management_url(created_account)
+    return f"""
+    <section class="section success-section">
+      <div class="container">
+        <p class="eyebrow">Account generated</p>
+        <h2>{html.escape(hostname)}</h2>
+        <p class="section-copy">Save this now. The password and management link are only shown on this screen.</p>
+        <div class="copy-list">
+          {_copy_row("Update-URL:", update_url)}
+          {_copy_row("Domainnamen:", hostname)}
+          {_copy_row("Benutzername:", username)}
+          {_copy_row("Kennwort:", password)}
+          {_copy_row("Magic management link:", management_url)}
+        </div>
+      </div>
     </section>
     """
 
 
 def _created_account_panel(service: DdnsService, created_account: dict[str, str] | None) -> str:
-    if not created_account:
-        return ""
-    hostname = html.escape(created_account["hostname"])
-    username = html.escape(created_account["username"])
-    password = html.escape(created_account["password"])
-    update_url = html.escape(service.fritz_update_url(created_account))
-    management_url = html.escape(service.magic_management_url(created_account))
+    return _credentials_panel(service, created_account)
+
+
+def _copy_row(label: str, value: str) -> str:
+    safe_label = html.escape(label)
+    safe_value = html.escape(value)
     return f"""
-    <section class="panel success-panel">
-      <div>
-        <p class="eyebrow">Account generated</p>
-        <h2>{hostname}</h2>
-      </div>
-      <div class="fritz-form">
-        <label>Update-URL:<input readonly value="{update_url}"></label>
-        <label>Domainnamen:<input readonly value="{hostname}"></label>
-        <label>Benutzername:<input readonly value="{username}"></label>
-        <label>Kennwort:<input readonly value="{password}"></label>
-        <label>Magic management link:<input readonly value="{management_url}"></label>
-      </div>
-      <p class="note">Save this now. The password and management link are only shown on this screen. The Update-URL and management link are separate cryptographically random bearer URLs.</p>
+    <div class="copy-row">
+      <span>{safe_label}</span>
+      <code>{safe_value}</code>
+      <button type="button" class="copy-button" data-copy="{safe_value}">Copy</button>
+    </div>
+    """
+
+
+def _message_band(message: str | None) -> str:
+    if not message:
+        return ""
+    return f"""
+    <section class="message-band">
+      <div class="container"><p>{html.escape(message)}</p></div>
     </section>
     """
+
+
+def _render_management_page(service: DdnsService, settings: DdnsSettings, management_slug: str, account: dict[str, str | int | None]) -> str:
+    account_for_url = {
+        "hostname": str(account["hostname"]),
+        "username": str(account["username"]),
+        "password": "",
+        "update_slug": str(account["update_slug"]),
+        "management_slug": management_slug,
+    }
+    update_url = service.fritz_update_url(account_for_url)
+    hostname = html.escape(str(account["hostname"]))
+    username = html.escape(str(account["username"]))
+    ipv4 = html.escape(str(account.get("ipv4") or "-"))
+    ipv6 = html.escape(str(account.get("ipv6") or "-"))
+    updated = html.escape(str(account.get("updated_at") or "Never"))
+    return _page(
+        "DynDNS management",
+        f"""
+        <main>
+          <section class="hero-band compact">
+            <div class="container hero-inner">
+              <p class="eyebrow">Magic management</p>
+              <h1>{hostname}</h1>
+              <p class="lead">Anyone with this link can manage or delete this hostname. Keep it private.</p>
+              <a class="button secondary" href="/">Home</a>
+            </div>
+          </section>
+          <section class="section">
+            <div class="container tool-grid">
+              <div>
+                <p class="eyebrow">Router settings</p>
+                <h2>FRITZ!Box fields</h2>
+                <p class="section-copy">Use these values in the custom DynDNS provider fields.</p>
+              </div>
+              <div class="copy-list">
+                {_copy_row("Update-URL:", update_url)}
+                {_copy_row("Domainnamen:", hostname)}
+                {_copy_row("Benutzername:", username)}
+                {_copy_row("Kennwort:", "unchanged; only shown when generated")}
+              </div>
+            </div>
+          </section>
+          <section class="section">
+            <div class="container split-row">
+              <div>
+                <p class="eyebrow">Current address</p>
+                <h2>Status</h2>
+              </div>
+              <table class="status-table">
+                <tbody>
+                  <tr><th>IPv4</th><td>{ipv4}</td></tr>
+                  <tr><th>IPv6</th><td>{ipv6}</td></tr>
+                  <tr><th>Updated</th><td>{updated}</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section class="section danger-section">
+            <div class="container split-row">
+              <div>
+                <p class="eyebrow">Danger zone</p>
+                <h2>Delete hostname</h2>
+                <p class="section-copy">This removes the account and DNS records. The router update URL will stop working.</p>
+              </div>
+              <form method="post" action="/m/{html.escape(management_slug)}/delete">
+                <button class="danger-button" type="submit">Delete hostname</button>
+              </form>
+            </div>
+          </section>
+        </main>
+        """,
+    )
 
 
 def _render_admin_page(
@@ -624,59 +830,84 @@ def _render_admin_page(
     return _page(
         "DynDNS Admin",
         f"""
-        <main class="shell">
-          <section class="topbar">
-            <div>
+        <main>
+          <section class="subnav">
+            <div class="container toolbar">
+              <strong>Operator console</strong>
+              <div class="button-row">
+                <a class="button secondary" href="/records">Records JSON</a>
+                <a class="button secondary" href="/events">Events JSON</a>
+              </div>
+            </div>
+          </section>
+          <section class="section admin-heading">
+            <div class="container">
               <p class="eyebrow">DynDNS aktiv</p>
               <h1>FRITZ!Box accounts</h1>
-            </div>
-            <div class="button-row">
-              <a class="button secondary" href="/records">JSON records</a>
-              <a class="button secondary" href="/events">Update events</a>
+              <p class="lead">Create, inspect, and retire router update credentials.</p>
             </div>
           </section>
 
           {_created_account_panel(service, created_account)}
 
-          <section class="panel">
-            <h2>Invites</h2>
-            <form method="post" action="/admin/invites" class="inline-form">
-              <input type="hidden" name="csrf" value="{csrf}">
-              <button type="submit">Create invite</button>
-            </form>
-            <div class="table-wrap">
-              <table>
-                <thead><tr><th>Code</th><th>Created</th><th>Used</th></tr></thead>
-                <tbody>{invite_rows}</tbody>
-              </table>
+          <section class="section">
+            <div class="container tool-grid">
+              <div>
+                <p class="eyebrow">Generate account</p>
+                <h2>Router credentials</h2>
+                <p class="section-copy">Generated accounts produce the FRITZ!Box fields: Update-URL, Domainnamen, Benutzername, Kennwort.</p>
+                <p class="note">{suffix_help}</p>
+              </div>
+              <form method="post" action="/admin/accounts" class="tool-card">
+                <input type="hidden" name="csrf" value="{csrf}">
+                <label>Domainnamen
+                  <input name="hostname" placeholder="home.example.net" required>
+                </label>
+                <label>Benutzername
+                  <input name="username" placeholder="auto-generated">
+                </label>
+                <button type="submit">Generate</button>
+              </form>
             </div>
           </section>
 
-          <section class="panel">
-            <h2>Generate account</h2>
-            <p class="intro">Geben Sie die Anmeldedaten für Ihren DynDNS-Anbieter an. Generated accounts produce the FRITZ!Box fields: Update-URL, Domainnamen, Benutzername, Kennwort.</p>
-            <form method="post" action="/admin/accounts" class="account-form">
-              <input type="hidden" name="csrf" value="{csrf}">
-              <label>Domainnamen
-                <input name="hostname" placeholder="home.example.net" required>
-              </label>
-              <label>Benutzername
-                <input name="username" placeholder="auto-generated">
-              </label>
-              <button type="submit">Generate</button>
-            </form>
-            <p class="note">{suffix_help}</p>
+          <section class="section">
+            <div class="container">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Invites</p>
+                  <h2>Registration codes</h2>
+                </div>
+                <form method="post" action="/admin/invites">
+                  <input type="hidden" name="csrf" value="{csrf}">
+                  <button type="submit">Create invite</button>
+                </form>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Code</th><th>Created</th><th>Used</th></tr></thead>
+                  <tbody>{invite_rows}</tbody>
+                </table>
+              </div>
+            </div>
           </section>
 
-          <section class="panel">
-            <h2>Accounts</h2>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr><th>Domain</th><th>User</th><th>Owner</th><th>IPv4</th><th>IPv6</th><th>Updated</th><th></th></tr>
-                </thead>
-                <tbody>{rows}</tbody>
-              </table>
+          <section class="section">
+            <div class="container">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Accounts</p>
+                  <h2>Active credentials</h2>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Domain</th><th>User</th><th>Owner</th><th>IPv4</th><th>IPv6</th><th>Updated</th><th></th></tr>
+                  </thead>
+                  <tbody>{rows}</tbody>
+                </table>
+              </div>
             </div>
           </section>
         </main>
@@ -723,61 +954,112 @@ def _page(title: str, body: str) -> str:
         <style>
           :root {{
             color-scheme: light;
-            --bg: #f6f7f9;
-            --text: #18202a;
-            --muted: #667085;
-            --line: #d9dee7;
-            --panel: #ffffff;
-            --accent: #1769aa;
-            --accent-strong: #0f548b;
-            --good: #e9f7ef;
-            --good-line: #9fd6b2;
+            --bg: #f5f5f7;
+            --surface: #ffffff;
+            --ink: #1d1d1f;
+            --muted: #6e6e73;
+            --line: #d2d2d7;
+            --soft-line: rgba(0, 0, 0, 0.08);
+            --blue: #0071e3;
+            --blue-hover: #0077ed;
+            --dark: #161617;
+            --dark-2: #1d1d1f;
+            --danger: #b42318;
           }}
           * {{ box-sizing: border-box; }}
+          html {{ scroll-behavior: smooth; }}
           body {{
             margin: 0;
             min-height: 100vh;
             background: var(--bg);
-            color: var(--text);
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: var(--ink);
+            font: 400 16px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
           }}
-          .shell {{ width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0; }}
-          .hero, .topbar {{ display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding: 28px 0; }}
+          .container {{ width: min(1040px, calc(100% - 40px)); margin: 0 auto; }}
+          .hero-band {{ min-height: 74vh; display: grid; align-items: center; background: var(--bg); text-align: center; padding: 84px 0; }}
+          .hero-band.compact {{ min-height: 420px; }}
+          .hero-inner {{ display: grid; justify-items: center; gap: 18px; }}
+          .section {{ padding: 72px 0; background: var(--surface); }}
+          .section + .section {{ border-top: 1px solid rgba(0, 0, 0, 0.04); }}
+          .section-dark {{ background: var(--dark); color: #f5f5f7; border-top: 0; }}
+          .success-section {{ background: #f5f5f7; }}
+          .danger-section {{ background: #fff; border-top: 1px solid var(--soft-line); }}
+          .message-band {{ background: #fff8e6; color: var(--ink); padding: 18px 0; border-block: 1px solid #f0cc74; }}
+          .subnav {{ position: sticky; top: 0; z-index: 10; min-height: 52px; display: flex; align-items: center; background: rgba(245, 245, 247, 0.82); border-bottom: 1px solid rgba(0, 0, 0, 0.08); backdrop-filter: saturate(180%) blur(20px); }}
+          .toolbar, .split-row, .section-heading {{ display: flex; align-items: center; justify-content: space-between; gap: 24px; }}
+          .page-heading, .admin-heading .container {{ max-width: 760px; }}
           .button-row {{ display: flex; gap: 10px; flex-wrap: wrap; }}
-          h1, h2, p {{ margin: 0; }}
-          h1 {{ font-size: 34px; line-height: 1.15; font-weight: 700; letter-spacing: 0; }}
-          h2 {{ font-size: 19px; line-height: 1.3; margin-bottom: 18px; }}
-          .eyebrow {{ margin-bottom: 8px; color: var(--accent); font-size: 13px; font-weight: 700; text-transform: uppercase; }}
-          .lead {{ max-width: 620px; margin-top: 12px; color: var(--muted); font-size: 17px; line-height: 1.5; }}
-          .intro {{ margin: -6px 0 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }}
-          .panel {{ background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 22px; margin: 18px 0; }}
-          .success-panel {{ background: var(--good); border-color: var(--good-line); }}
-          .warning-panel {{ background: #fff8e6; border-color: #f0cc74; }}
-          .account-form, .fritz-form {{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 260px) auto; gap: 14px; align-items: end; }}
+          h1, h2, h3, p {{ margin: 0; }}
+          h1 {{ max-width: 760px; font-size: 48px; line-height: 1.08; font-weight: 650; letter-spacing: -0.02em; }}
+          h2 {{ font-size: 28px; line-height: 1.16; font-weight: 600; letter-spacing: -0.015em; }}
+          h3 {{ font-size: 18px; line-height: 1.25; font-weight: 600; }}
+          .eyebrow {{ color: var(--blue); font-size: 13px; font-weight: 600; letter-spacing: 0; }}
+          .lead {{ max-width: 660px; color: var(--muted); font-size: 19px; line-height: 1.47; letter-spacing: -0.01em; }}
+          .section-dark .lead, .section-dark .section-copy, .section-dark .note {{ color: #cccccc; }}
+          .section-copy, .intro {{ margin-top: 12px; max-width: 560px; color: var(--muted); font-size: 15px; line-height: 1.5; }}
+          .hero-actions {{ display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }}
+          .tool-grid {{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 440px); gap: 40px; align-items: start; }}
+          .tool-card, .step-card, .secondary-card {{ display: grid; gap: 16px; padding: 24px; background: var(--surface); border: 1px solid var(--soft-line); border-radius: 8px; }}
+          .secondary-card {{ background: #fafafc; }}
+          .section-dark .step-card {{ background: #242426; border-color: rgba(255, 255, 255, 0.12); }}
+          .section-dark .muted-card {{ opacity: .66; }}
           .auth-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }}
-          .stack-form {{ display: grid; gap: 14px; }}
+          .step-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 28px; }}
+          .stack-form {{ display: grid; gap: 16px; }}
           .inline-form {{ margin-top: 14px; }}
-          .fritz-form {{ grid-template-columns: 1fr; margin-top: 18px; }}
-          label {{ display: grid; gap: 7px; color: var(--muted); font-size: 13px; font-weight: 650; }}
-          input {{ width: 100%; min-height: 42px; border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; color: var(--text); font: inherit; background: #fff; }}
-          input[readonly] {{ background: #f9fafb; }}
-          button, .button {{ min-height: 42px; border: 0; border-radius: 6px; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: #fff; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }}
-          button:hover, .button:hover {{ background: var(--accent-strong); }}
-          .secondary {{ background: #344054; }}
-          .note {{ margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.45; }}
+          label {{ display: grid; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 500; }}
+          input {{ width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; color: var(--ink); font: inherit; background: #fff; outline: none; }}
+          input:focus {{ border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.16); }}
+          button, .button {{ min-height: 44px; border: 0; border-radius: 999px; padding: 0 20px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--blue); color: #fff; font: inherit; font-size: 15px; font-weight: 500; text-decoration: none; cursor: pointer; transition: background .16s ease, transform .16s ease; }}
+          button:hover, .button:hover {{ background: var(--blue-hover); }}
+          button:active, .button:active {{ transform: scale(.97); }}
+          .secondary {{ background: #e8e8ed; color: var(--ink); }}
+          .secondary:hover {{ background: #dedee3; }}
+          .secondary-on-dark {{ background: transparent; color: #f5f5f7; border: 1px solid rgba(255, 255, 255, 0.36); }}
+          .secondary-on-dark:hover {{ background: rgba(255, 255, 255, 0.12); }}
+          .danger-button {{ background: transparent; color: var(--danger); border: 1px solid rgba(180, 35, 24, 0.28); }}
+          .danger-button:hover {{ background: #fff1f0; }}
+          .note {{ margin-top: 10px; color: var(--muted); font-size: 13px; line-height: 1.45; }}
+          .copy-list {{ display: grid; gap: 10px; }}
+          .copy-row {{ display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 48px; padding: 10px 10px 10px 14px; background: #fff; border: 1px solid var(--soft-line); border-radius: 8px; }}
+          .copy-row span {{ color: var(--muted); font-size: 13px; }}
+          .copy-row code {{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }}
+          .copy-button {{ min-height: 32px; padding: 0 12px; border-radius: 999px; background: #f5f5f7; color: var(--blue); font-size: 13px; }}
+          .copy-button:hover {{ background: #e8e8ed; }}
+          .step-number {{ width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: var(--blue); color: white; border-radius: 50%; font-size: 13px; }}
           .table-wrap {{ overflow-x: auto; }}
-          table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
-          th, td {{ border-bottom: 1px solid var(--line); padding: 12px 10px; text-align: left; white-space: nowrap; }}
-          th {{ color: var(--muted); font-size: 12px; text-transform: uppercase; }}
+          table {{ width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }}
+          th, td {{ border-bottom: 1px solid var(--soft-line); padding: 14px 10px; text-align: left; white-space: nowrap; }}
+          th {{ color: var(--muted); font-size: 12px; font-weight: 600; }}
           .empty {{ color: var(--muted); text-align: center; padding: 28px; }}
-          .icon-button {{ width: 32px; min-height: 32px; padding: 0; background: #eef1f5; color: #344054; }}
-          .icon-button:hover {{ background: #dce3ec; }}
-          @media (max-width: 760px) {{
-            .hero, .topbar {{ align-items: flex-start; flex-direction: column; }}
-            .account-form, .auth-grid {{ grid-template-columns: 1fr; }}
-            h1 {{ font-size: 28px; }}
+          .icon-button {{ width: 32px; min-height: 32px; padding: 0; background: #f5f5f7; color: var(--danger); }}
+          .icon-button:hover {{ background: #fff1f0; }}
+          @media (max-width: 860px) {{
+            .tool-grid, .auth-grid, .step-grid {{ grid-template-columns: 1fr; }}
+            .toolbar, .split-row, .section-heading {{ align-items: flex-start; flex-direction: column; }}
+            .section, .hero-band {{ padding: 52px 0; }}
+            h1 {{ font-size: 36px; }}
+            .lead {{ font-size: 17px; }}
+          }}
+          @media (max-width: 560px) {{
+            .container {{ width: min(100% - 28px, 1040px); }}
+            .copy-row {{ grid-template-columns: 1fr; }}
+            .copy-button {{ width: max-content; }}
+            h1 {{ font-size: 31px; }}
           }}
         </style>
+        <script>
+          document.addEventListener("click", async (event) => {{
+            const button = event.target.closest("[data-copy]");
+            if (!button) return;
+            try {{
+              await navigator.clipboard.writeText(button.dataset.copy || "");
+              const old = button.textContent;
+              button.textContent = "Copied";
+              setTimeout(() => {{ button.textContent = old; }}, 1200);
+            }} catch (_) {{}}
+          }});
+        </script>
       </head>
       <body>{body}</body>
     </html>
