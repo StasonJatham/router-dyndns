@@ -71,9 +71,16 @@ def is_rate_limited_path(path: str) -> bool:
         "/verify-domain",
         "/nic/update",
     }
-    return path in limited_paths or path.startswith(("/u/", "/api/v1/updates/")) or path.startswith(
-        ("/api/v1/hostnames/", "/api/v1/domains/")
+    return path in limited_paths or path.startswith(("/u/", "/m/", "/d/", "/api/v1/updates/")) or path.startswith(
+        ("/api/v1/hostnames/", "/api/v1/domains/", "/api/v1/management/")
     )
+
+
+def rate_limit_bucket(path: str) -> str:
+    for prefix in ("/u/", "/m/", "/d/", "/api/v1/updates/", "/api/v1/management/"):
+        if path.startswith(prefix):
+            return prefix.rstrip("/")
+    return path
 
 
 def _trusted_proxy(peer: str, trusted: set[str]) -> bool:

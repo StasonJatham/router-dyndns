@@ -9,7 +9,7 @@ services:
     volumes:
       - ddns-data:/data
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2).read()"]
+      test: ["CMD", "python", "-c", "import os, urllib.parse, urllib.request; host=urllib.parse.urlparse(os.environ['DDNS_PUBLIC_BASE_URL']).hostname; req=urllib.request.Request('http://127.0.0.1:8080/healthz', headers={'Host': host}); urllib.request.urlopen(req, timeout=2).read()"]
       interval: 30s
       timeout: 5s
       retries: 3

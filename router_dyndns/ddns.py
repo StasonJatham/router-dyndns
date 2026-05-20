@@ -14,6 +14,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 from starlette.concurrency import run_in_threadpool
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from .ddns_api import create_api_router
@@ -24,6 +25,7 @@ from .ddns_security import (
     client_ip,
     credentials_from_basic_auth,
     is_rate_limited_path,
+    rate_limit_bucket,
     require_admin_csrf,
 )
 from .ddns_service import DdnsService, normalize_domain, normalize_hostname
@@ -59,6 +61,31 @@ OPENAPI_TAGS = [
 ]
 
 ASSET_DIR = Path(__file__).with_name("assets")
+
+APP_JS = """
+(() => {
+  const applyTheme = () => {
+    const theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.setAttribute("data-bs-theme", theme);
+    document.documentElement.style.colorScheme = theme;
+  };
+  applyTheme();
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+})();
+
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-copy]");
+  if (!button) return;
+  try {
+    await navigator.clipboard.writeText(button.dataset.copy || "");
+    const old = button.textContent;
+    button.textContent = "Copied";
+    setTimeout(() => {
+      button.textContent = old;
+    }, 1200);
+  } catch (_) {}
+});
+""".strip()
 
 
 class RequestBodyTooLargeError(Exception):
@@ -99,6 +126,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
         settings = settings.model_copy(update={"admin_password": settings.shared_secret})
     if settings.require_dns_provider and not dns_backend_configured(settings):
         raise RuntimeError("DDNS_REQUIRE_DNS_PROVIDER is set but no DNS backend is configured")
+    settings.validate_launch_ready()
 
     store = DdnsStore(settings.database_path)
     store.cleanup(settings.cleanup_challenge_hours, settings.cleanup_unused_account_hours)
@@ -127,6 +155,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
         openapi_tags=OPENAPI_TAGS,
         lifespan=lifespan,
     )
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.effective_trusted_hosts)
     app.add_middleware(RequestBodyLimitMiddleware, max_body_bytes=settings.max_request_body_bytes)
     app.include_router(create_api_router(settings, store, service))
 
@@ -141,7 +170,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
 
         if is_rate_limited_path(request.url.path) or _is_admin_path(request.url.path):
             limit = settings.admin_rate_limit_per_minute if _is_admin_path(request.url.path) else settings.rate_limit_per_minute
-            key = f"{client_ip(request, settings)}:{request.url.path}"
+            key = f"{client_ip(request, settings)}:{rate_limit_bucket(request.url.path)}"
             allowed = await run_in_threadpool(store.allow_rate_limit, key, limit)
             if not allowed:
                 return PlainTextResponse("rate limit exceeded", status_code=429)
@@ -154,9 +183,7 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "same-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; script-src 'unsafe-inline' 'self'; style-src 'unsafe-inline' 'self' https://cdn.jsdelivr.net; form-action 'self'; frame-ancestors 'none'"
-        )
+        response.headers["Content-Security-Policy"] = _content_security_policy(request.url.path)
         if settings.public_base_url.startswith("https://"):
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
@@ -441,6 +468,10 @@ def make_app(settings: DdnsSettings | None = None) -> FastAPI:
     def logo_png() -> FileResponse:
         return FileResponse(ASSET_DIR / "logo.png", media_type="image/png")
 
+    @app.get("/app.js", include_in_schema=False)
+    def app_js() -> Response:
+        return Response(APP_JS, media_type="application/javascript")
+
     @app.get("/u/{update_slug}", response_class=PlainTextResponse, response_model=None)
     def slug_update(
         update_slug: str,
@@ -516,6 +547,30 @@ def _is_secret_response(request: Request) -> bool:
     if path.startswith(("/api/v1/hostnames/", "/api/v1/domains/")):
         return request.method in {"POST", "DELETE"}
     return request.method == "POST" and path in {"/magic", "/request-domain", "/verify-domain", "/accounts"}
+
+
+def _content_security_policy(path: str) -> str:
+    if path in {"/docs", "/redoc", "/openapi.json"}:
+        return (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https://fastapi.tiangolo.com; "
+            "font-src 'self' https://cdn.jsdelivr.net; "
+            "connect-src 'self'; "
+            "form-action 'self'; "
+            "frame-ancestors 'none'"
+        )
+    return (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "img-src 'self' data:; "
+        "font-src 'self' https://cdn.jsdelivr.net; "
+        "connect-src 'self'; "
+        "form-action 'self'; "
+        "frame-ancestors 'none'"
+    )
 
 
 def _render_public_home(
@@ -1038,17 +1093,7 @@ def _page(title: str, body: str) -> str:
         <link rel="icon" href="/favicon.ico" sizes="any">
         <link rel="icon" href="/logo.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/logo.png">
-        <script>
-          (() => {{
-            const applyTheme = () => {{
-              const theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-              document.documentElement.setAttribute("data-bs-theme", theme);
-              document.documentElement.style.colorScheme = theme;
-            }};
-            applyTheme();
-            window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
-          }})();
-        </script>
+        <script src="/app.js" defer></script>
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
         <style>
           :root {{
@@ -1195,18 +1240,6 @@ def _page(title: str, body: str) -> str:
             h2 {{ font-size: 25px; }}
           }}
         </style>
-        <script>
-          document.addEventListener("click", async (event) => {{
-            const button = event.target.closest("[data-copy]");
-            if (!button) return;
-            try {{
-              await navigator.clipboard.writeText(button.dataset.copy || "");
-              const old = button.textContent;
-              button.textContent = "Copied";
-              setTimeout(() => {{ button.textContent = old; }}, 1200);
-            }} catch (_) {{}}
-          }});
-        </script>
       </head>
       <body>{body}</body>
     </html>

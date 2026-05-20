@@ -212,6 +212,23 @@ def test_admin_routes_are_rate_limited(tmp_path: Path) -> None:
     assert second.status_code == 429
 
 
+def test_bearer_link_routes_share_rate_limit_bucket(tmp_path: Path) -> None:
+    app = make_app(
+        DdnsSettings(
+            database_path=tmp_path / "ddns.sqlite3",
+            admin_password="admin",
+            rate_limit_per_minute=1,
+        )
+    )
+    client = TestClient(app)
+
+    first = client.get("/m/not-a-real-token")
+    second = client.get("/m/another-token")
+
+    assert first.status_code == 404
+    assert second.status_code == 429
+
+
 def test_admin_can_rotate_links_and_password(tmp_path: Path) -> None:
     settings = DdnsSettings(
         database_path=tmp_path / "ddns.sqlite3",
@@ -385,10 +402,13 @@ def test_api_docs_include_versioned_ddns_api(tmp_path: Path) -> None:
     app = make_app(DdnsSettings(database_path=tmp_path / "ddns.sqlite3", admin_password="admin"))
     client = TestClient(app)
 
+    docs = client.get("/docs")
     redoc = client.get("/redoc")
     schema = client.get("/openapi.json").json()
 
+    assert docs.status_code == 200
     assert redoc.status_code == 200
+    assert "unsafe-inline" in docs.headers["content-security-policy"]
     assert "/api/v1/hostnames/magic" in schema["paths"]
     assert "/api/v1/updates/{update_slug}" in schema["paths"]
     assert "/admin" not in schema["paths"]
@@ -396,6 +416,35 @@ def test_api_docs_include_versioned_ddns_api(tmp_path: Path) -> None:
     assert "/events" not in schema["paths"]
     assert any(tag["name"] == "hostnames" for tag in schema["tags"])
     assert all(tag["name"] != "admin" for tag in schema["tags"])
+
+
+def test_application_pages_use_stricter_script_csp(tmp_path: Path) -> None:
+    app = make_app(DdnsSettings(database_path=tmp_path / "ddns.sqlite3", admin_password="admin"))
+    client = TestClient(app)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert '<script src="/app.js" defer></script>' in response.text
+    assert "script-src 'self'" in response.headers["content-security-policy"]
+    assert "script-src 'self' 'unsafe-inline'" not in response.headers["content-security-policy"]
+    assert client.get("/app.js").status_code == 200
+
+
+def test_trusted_host_middleware_rejects_unlisted_host(tmp_path: Path) -> None:
+    app = make_app(
+        DdnsSettings(
+            database_path=tmp_path / "ddns.sqlite3",
+            admin_password="admin",
+            public_base_url="http://ddns.example.net",
+            trusted_hosts={"ddns.example.net"},
+        )
+    )
+    client = TestClient(app)
+
+    response = client.get("/", headers={"host": "evil.example.net"})
+
+    assert response.status_code == 400
 
 
 def test_api_magic_hostname_lifecycle(tmp_path: Path) -> None:
@@ -635,6 +684,26 @@ def test_require_dns_provider_fails_startup_without_backend(tmp_path: Path) -> N
         )
     except RuntimeError as exc:
         assert "no DNS backend" in str(exc)
+    else:
+        raise AssertionError("expected startup failure")
+
+
+def test_launch_mode_requires_strong_admin_password(tmp_path: Path) -> None:
+    try:
+        make_app(
+            DdnsSettings(
+                database_path=tmp_path / "ddns.sqlite3",
+                admin_password="admin",
+                public_base_url="http://ddns.example.net",
+                hostname_suffix="ddns.example.net",
+                dns_provider="cloudflare",
+                cloudflare_api_token="token",
+                cloudflare_zone_id="zone",
+                require_dns_provider=True,
+            )
+        )
+    except RuntimeError as exc:
+        assert "DDNS_ADMIN_PASSWORD" in str(exc)
     else:
         raise AssertionError("expected startup failure")
 

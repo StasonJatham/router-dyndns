@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,6 +14,7 @@ class DdnsSettings(BaseModel):
     admin_password: str = Field(default="")
     allowed_hosts: set[str] = Field(default_factory=set)
     public_base_url: str = Field(default="http://localhost:8080")
+    trusted_hosts: set[str] = Field(default_factory=set)
     hostname_suffix: str = Field(default="")
     verification_prefix: str = Field(default="_router_dyndns-ddns")
     rate_limit_per_minute: int = Field(default=60, ge=1, le=10_000)
@@ -40,6 +42,31 @@ class DdnsSettings(BaseModel):
             raise ValueError("public_base_url must start with http:// or https://")
         return value.rstrip("/")
 
+    @field_validator("trusted_hosts")
+    @classmethod
+    def validate_trusted_hosts(cls, value: set[str]) -> set[str]:
+        return {host.strip().lower() for host in value if host.strip()}
+
+    @property
+    def effective_trusted_hosts(self) -> list[str]:
+        hosts = set(self.trusted_hosts)
+        public_host = urllib.parse.urlparse(self.public_base_url).hostname
+        if public_host:
+            hosts.add(public_host.lower())
+        if not self.require_dns_provider:
+            hosts.update({"testserver", "localhost", "127.0.0.1", "::1"})
+        return sorted(hosts)
+
+    def validate_launch_ready(self) -> None:
+        if not self.require_dns_provider:
+            return
+        if len(self.admin_password) < 16:
+            raise RuntimeError("DDNS_ADMIN_PASSWORD must be at least 16 characters when DDNS_REQUIRE_DNS_PROVIDER=1")
+        if not self.hostname_suffix:
+            raise RuntimeError("DDNS_HOSTNAME_SUFFIX is required when DDNS_REQUIRE_DNS_PROVIDER=1")
+        if not self.effective_trusted_hosts:
+            raise RuntimeError("At least one trusted host is required for production")
+
     @classmethod
     def from_env(cls) -> DdnsSettings:
         allowed = {
@@ -48,6 +75,7 @@ class DdnsSettings(BaseModel):
             if item.strip()
         }
         trusted_proxy_ips = _csv_set("DDNS_TRUSTED_PROXY_IPS")
+        trusted_hosts = _csv_set("DDNS_TRUSTED_HOSTS")
         dns_zones = _csv_set("DDNS_DNS_ZONES")
         return cls(
             database_path=Path(os.getenv("DDNS_DATABASE", "ddns.sqlite3")),
@@ -55,6 +83,7 @@ class DdnsSettings(BaseModel):
             admin_password=os.getenv("DDNS_ADMIN_PASSWORD", os.getenv("DDNS_SHARED_SECRET", "")),
             allowed_hosts=allowed,
             public_base_url=os.getenv("DDNS_PUBLIC_BASE_URL", "http://localhost:8080"),
+            trusted_hosts=trusted_hosts,
             hostname_suffix=os.getenv("DDNS_HOSTNAME_SUFFIX", ""),
             verification_prefix=os.getenv("DDNS_VERIFICATION_PREFIX", "_router_dyndns-ddns"),
             rate_limit_per_minute=_env_int("DDNS_RATE_LIMIT_PER_MINUTE", 60),

@@ -102,6 +102,7 @@ For an internet-facing DynDNS service, run behind HTTPS and require a real DNS b
 export DDNS_PUBLIC_BASE_URL='https://ddns.example.net'
 export DDNS_HOSTNAME_SUFFIX='ddns.example.net'
 export DDNS_DATABASE='/data/ddns.sqlite3'
+export DDNS_TRUSTED_HOSTS='ddns.example.net'
 export DDNS_REQUIRE_DNS_PROVIDER=1
 export DDNS_DNS_ZONES='ddns.example.net'
 export DDNS_TRUSTED_PROXY_IPS='127.0.0.1,::1'
@@ -211,6 +212,7 @@ docker compose up -d --build
 - Keep `.env` out of git.
 - Use a long random value for `DDNS_ADMIN_PASSWORD`.
 - Use a least-privilege DNS API token or TSIG key.
+- Set `DDNS_TRUSTED_HOSTS` to the public hostnames your reverse proxy will forward, for example `ddns.example.net`.
 - Configure `DDNS_TRUSTED_PROXY_IPS` only for reverse proxies that strip user-supplied forwarding headers.
 - Keep `/docs` and `/redoc` available for API users if you want a public developer surface. Admin routes are hidden from OpenAPI and still require Basic auth.
 - Leave cleanup enabled. The app periodically removes abandoned TXT challenges and generated hostnames that were never updated by a router.
@@ -224,6 +226,7 @@ Security and cleanup defaults:
 | `DDNS_RATE_LIMIT_PER_MINUTE` | `60` | Public update/API/form requests allowed per source IP and path. |
 | `DDNS_ADMIN_RATE_LIMIT_PER_MINUTE` | `20` | Admin/operator requests allowed per source IP and path. |
 | `DDNS_MAX_REQUEST_BODY_BYTES` | `16384` | Maximum accepted request body for form/API endpoints. |
+| `DDNS_TRUSTED_HOSTS` | from `DDNS_PUBLIC_BASE_URL` | Host header allowlist. Add every public hostname that should serve the app. |
 | `DDNS_CLEANUP_CHALLENGE_HOURS` | `72` | Delete unverified DNS TXT claims after this many hours. |
 | `DDNS_CLEANUP_UNUSED_ACCOUNT_HOURS` | `168` | Delete generated hostnames that never received a router update after this many hours. |
 | `DDNS_CLEANUP_INTERVAL_SECONDS` | `3600` | Run the in-app cleanup scheduler at this interval. |
