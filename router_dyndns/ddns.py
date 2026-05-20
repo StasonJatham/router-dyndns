@@ -613,7 +613,7 @@ def _render_public_home(
               <form method="post" action="/magic" class="col-lg-5 card card-body gap-3" aria-label="Create a generated DynDNS hostname">
                 <label>Router username
                   <input class="form-control" name="username" placeholder="optional" autocomplete="off" inputmode="text">
-                  <span class="field-hint">Leave empty to generate one automatically.</span>
+                  <span class="form-text m-0">Leave empty to generate one automatically.</span>
                 </label>
                 <button type="submit" class="btn btn-primary rounded-pill">Generate hostname</button>
               </form>
@@ -621,11 +621,11 @@ def _render_public_home(
             </div>
           </section>
           {challenge_html}
-          <footer class="footer">
-            <div class="container footer-links">
-              <a href="/docs">API docs</a>
-              <a href="/redoc">ReDoc</a>
-              <a href="/admin">Admin</a>
+          <footer class="py-4 bg-body-tertiary border-top">
+            <div class="container nav justify-content-center gap-3">
+              <a class="nav-link p-0 small text-secondary" href="/docs">API docs</a>
+              <a class="nav-link p-0 small text-secondary" href="/redoc">ReDoc</a>
+              <a class="nav-link p-0 small text-secondary" href="/admin">Admin</a>
             </div>
           </footer>
         </main>
@@ -666,13 +666,13 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
         challenge_html = f"""
         <div class="col-md-4">
         <div class="card card-body h-100 gap-3">
-          <span class="step-number">2</span>
+          <span class="badge text-bg-primary rounded-circle align-self-start">2</span>
           <h3>Add the TXT record</h3>
-          <p class="note">{status}</p>
+          <p class="small text-secondary mb-0 mt-2">{status}</p>
           {_copy_row("TXT name", verification_name)}
           {_copy_row("TXT value", token)}
           {_copy_row("Private claim link", claim_url)}
-          <form method="post" action="/verify-domain" class="inline-form" aria-label="Check DNS TXT verification">
+          <form method="post" action="/verify-domain" class="mt-3" aria-label="Check DNS TXT verification">
             <input type="hidden" name="domain" value="{domain}">
             <input type="hidden" name="claim_secret" value="{claim_secret}">
             <button type="submit" class="btn btn-primary rounded-pill">Check DNS record</button>
@@ -684,9 +684,9 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
             create_form = f"""
             <div class="col-md-4">
             <div class="card card-body h-100 gap-3">
-              <span class="step-number">3</span>
+              <span class="badge text-bg-primary rounded-circle align-self-start">3</span>
               <h3>Create router hostname</h3>
-              <form method="post" action="/accounts" class="stack-form" aria-label="Create custom-domain router credentials">
+              <form method="post" action="/accounts" class="d-grid gap-3" aria-label="Create custom-domain router credentials">
                 <input type="hidden" name="mode" value="custom">
                 <input type="hidden" name="claim_secret" value="{claim_secret}">
                 <label>Verified hostname
@@ -694,7 +694,7 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
                 </label>
                 <label>Router username
                   <input class="form-control" name="username" placeholder="optional" autocomplete="off">
-                  <span class="field-hint">Leave empty to generate one automatically.</span>
+                  <span class="form-text m-0">Leave empty to generate one automatically.</span>
                 </label>
                 <button type="submit" class="btn btn-primary rounded-pill">Create credentials</button>
               </form>
@@ -705,9 +705,9 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
             create_form = """
             <div class="col-md-4">
             <div class="card card-body h-100 gap-3 opacity-75">
-              <span class="step-number">3</span>
+              <span class="badge text-bg-primary rounded-circle align-self-start">3</span>
               <h3>Create router hostname</h3>
-              <p class="note">This unlocks after the TXT record is visible in public DNS.</p>
+              <p class="small text-secondary mb-0 mt-2">This unlocks after the TXT record is visible in public DNS.</p>
             </div>
             </div>
             """
@@ -725,9 +725,9 @@ def _custom_domain_flow(service: DdnsService, challenge: dict[str, str | None] |
         <div class="row g-3 mt-4">
           <div class="col-md-4">
           <div class="card card-body h-100 gap-3">
-            <span class="step-number">1</span>
+            <span class="badge text-bg-primary rounded-circle align-self-start">1</span>
             <h3>Enter domain</h3>
-            <form method="post" action="/request-domain" class="stack-form" aria-label="Request a custom domain TXT challenge">
+            <form method="post" action="/request-domain" class="d-grid gap-3" aria-label="Request a custom domain TXT challenge">
               <label>Domain
                 <input class="form-control" name="domain" placeholder="example.com" autocomplete="off" autocapitalize="none" spellcheck="false" required>
               </label>
@@ -757,7 +757,7 @@ def _credentials_panel(service: DdnsService, created_account: dict[str, str] | N
         <p class="eyebrow">Credentials generated</p>
         <h2>{html.escape(hostname)}</h2>
         <p class="section-copy">Save this now. The password and management link are only shown on this screen.</p>
-        <div class="copy-list">
+        <div class="d-grid gap-2">
           {_copy_row("Update-URL:", update_url)}
           {_copy_row("Domainnamen:", hostname)}
           {_copy_row("Benutzername:", username)}
@@ -780,7 +780,7 @@ def _admin_secret_panel(title: str, rows: list[str]) -> str:
         <p class="eyebrow">Admin action</p>
         <h2>{html.escape(title)}</h2>
         <p class="section-copy">Copy this now. Secret values are only shown in this response.</p>
-        <div class="copy-list">
+        <div class="d-grid gap-2">
           {"".join(rows)}
         </div>
       </div>
@@ -795,7 +795,7 @@ def _copy_row(label: str, value: str) -> str:
     <div class="input-group copy-field">
       <span class="input-group-text">{safe_label}</span>
       <code class="form-control text-truncate">{safe_value}</code>
-      <button type="button" class="btn btn-outline-secondary copy-button" data-copy="{safe_value}" aria-label="Copy {safe_label}">Copy</button>
+      <button type="button" class="btn btn-outline-secondary text-primary" data-copy="{safe_value}" aria-label="Copy {safe_label}">Copy</button>
     </div>
     """
 
@@ -848,7 +848,7 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
                 <h2>FRITZ!Box fields</h2>
                 <p class="section-copy">Use these values in the FRITZ!Box custom DynDNS provider fields.</p>
               </div>
-              <div class="col-lg-6 copy-list">
+              <div class="col-lg-6 d-grid gap-2">
                 {_copy_row("Update-URL:", update_url)}
                 {_copy_row("Domainnamen:", hostname)}
                 {_copy_row("Benutzername:", username)}
@@ -863,7 +863,7 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
                 <p class="eyebrow">Current address</p>
                 <h2>Status</h2>
               </div>
-              <table class="table status-table">
+              <table class="table mb-0 w-auto">
                 <tbody>
                   <tr><th>IPv4</th><td>{ipv4}</td></tr>
                   <tr><th>IPv6</th><td>{ipv6}</td></tr>
@@ -897,7 +897,7 @@ def _render_management_page(service: DdnsService, settings: DdnsSettings, manage
                 <p class="section-copy">This removes the hostname and DNS records. The router update URL will stop working.</p>
               </div>
               <form method="post" action="/m/{html.escape(management_slug)}/delete">
-                <button class="btn btn-outline-danger rounded-pill danger-button" type="submit">Delete hostname</button>
+                <button class="btn btn-outline-danger rounded-pill" type="submit">Delete hostname</button>
               </form>
             </div>
           </section>
@@ -973,7 +973,7 @@ def _render_admin_page(
                 <p class="eyebrow">Generate credentials</p>
                 <h2>Router credentials</h2>
                 <p class="section-copy">Generated credentials produce the FRITZ!Box fields: Update-URL, Domainnamen, Benutzername, Kennwort.</p>
-                <p class="note">{suffix_help}</p>
+                <p class="small text-secondary mb-0 mt-2">{suffix_help}</p>
               </div>
               <form method="post" action="/admin/accounts" class="col-lg-5 card card-body gap-3" aria-label="Create router credentials">
                 <input type="hidden" name="csrf" value="{csrf}">
@@ -982,7 +982,7 @@ def _render_admin_page(
                 </label>
                 <label>Benutzername
                   <input class="form-control" name="username" placeholder="auto-generated" autocomplete="off">
-                  <span class="field-hint">Leave empty to generate one from the hostname.</span>
+                  <span class="form-text m-0">Leave empty to generate one from the hostname.</span>
                 </label>
                 <button type="submit" class="btn btn-primary rounded-pill">Generate credentials</button>
               </form>
@@ -1074,19 +1074,19 @@ def _account_row(account: dict[str, str | int | None], csrf: str = "") -> str:
       <tr>
         <td>{hostname}</td><td>{username}</td><td>{ipv4}</td><td>{ipv6}</td><td>{updated}</td>
         <td>
-          <form method="post" action="/admin/accounts/rotate" class="table-actions">
+          <form method="post" action="/admin/accounts/rotate" class="d-flex gap-2 flex-wrap">
             <input type="hidden" name="csrf" value="{html.escape(csrf)}">
             <input type="hidden" name="hostname" value="{hostname}">
-            <button name="action" value="update" class="btn btn-sm btn-light small-button" title="Rotate update URL" aria-label="Rotate update URL for {hostname}">Update URL</button>
-            <button name="action" value="management" class="btn btn-sm btn-light small-button" title="Rotate management link" aria-label="Rotate management link for {hostname}">Manage link</button>
-            <button name="action" value="password" class="btn btn-sm btn-light small-button" title="Rotate router password" aria-label="Rotate router password for {hostname}">Password</button>
+            <button name="action" value="update" class="btn btn-sm btn-light px-3 text-primary" title="Rotate update URL" aria-label="Rotate update URL for {hostname}">Update URL</button>
+            <button name="action" value="management" class="btn btn-sm btn-light px-3 text-primary" title="Rotate management link" aria-label="Rotate management link for {hostname}">Manage link</button>
+            <button name="action" value="password" class="btn btn-sm btn-light px-3 text-primary" title="Rotate router password" aria-label="Rotate router password for {hostname}">Password</button>
           </form>
         </td>
         <td>
           <form method="post" action="/admin/accounts/delete">
             <input type="hidden" name="csrf" value="{html.escape(csrf)}">
             <input type="hidden" name="hostname" value="{hostname}">
-            <button class="btn btn-sm btn-light icon-button" title="Delete hostname" aria-label="Delete {hostname}">x</button>
+            <button class="btn btn-sm btn-light px-2 text-danger" title="Delete hostname" aria-label="Delete {hostname}">x</button>
           </form>
         </td>
       </tr>
@@ -1201,47 +1201,33 @@ def _page(title: str, body: str) -> str:
           .success-section {{ background: var(--rp-bg); }}
           .danger-section {{ background: var(--rp-surface); border-top: 1px solid var(--rp-soft-line); }}
           .page-heading, .admin-heading .container {{ max-width: 760px; }}
-          .button-row {{ display: flex; gap: 10px; flex-wrap: wrap; }}
           h1, h2, h3, p {{ margin: 0; }}
           h1 {{ max-width: 760px; font-size: 48px; line-height: 1.08; font-weight: 650; letter-spacing: -0.02em; }}
           h2 {{ font-size: 28px; line-height: 1.16; font-weight: 600; letter-spacing: -0.015em; }}
           h3 {{ font-size: 18px; line-height: 1.25; font-weight: 600; }}
           .eyebrow {{ color: var(--bs-primary); font-size: 13px; font-weight: 600; letter-spacing: 0; }}
           .lead {{ max-width: 660px; color: var(--rp-muted); font-size: 19px; line-height: 1.47; letter-spacing: -0.01em; }}
-          .section-dark .lead, .section-dark .section-copy, .section-dark .note {{ color: #cccccc; }}
+          .section-dark .lead, .section-dark .section-copy {{ color: #cccccc; }}
           .section-copy, .intro {{ margin-top: 12px; max-width: 560px; color: var(--rp-muted); font-size: 15px; line-height: 1.5; }}
           .card {{ background: var(--rp-surface); border-color: var(--rp-line); border-radius: .75rem; }}
           .section-dark .card {{ background: var(--rp-dark-card); border-color: rgba(255, 255, 255, 0.14); color: #f5f5f7; }}
-          .stack-form {{ display: grid; gap: 16px; }}
-          .inline-form {{ margin-top: 14px; }}
           label {{ display: grid; gap: 8px; color: var(--rp-muted); font-size: 13px; font-weight: 500; }}
           input {{ width: 100%; min-height: 44px; border: 1px solid var(--bs-border-color); border-radius: .5rem; padding: 10px 12px; color: var(--bs-body-color); font: inherit; background: var(--bs-body-bg); outline: none; }}
           input:focus {{ border-color: var(--bs-primary); box-shadow: 0 0 0 .25rem rgba(var(--bs-primary-rgb), .16); }}
-          .field-hint {{ color: var(--rp-muted); font-size: 12px; font-weight: 400; line-height: 1.35; }}
-          .btn {{ min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; font-weight: 500; transition: background-color .16s ease, border-color .16s ease, transform .16s ease; }}
+          .btn {{ display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 500; transition: background-color .16s ease, border-color .16s ease, transform .16s ease; }}
+          .btn:not(.btn-sm) {{ min-height: 44px; font-size: 15px; }}
+          .btn-sm {{ min-height: 32px; }}
           .btn:active {{ transform: scale(.97); }}
           .btn:focus-visible, a:focus-visible, input:focus-visible {{ outline: 2px solid var(--bs-primary); outline-offset: 3px; }}
           .btn-light {{ --bs-btn-bg: var(--rp-surface-alt); --bs-btn-border-color: var(--rp-line); --bs-btn-color: var(--rp-ink); --bs-btn-hover-bg: var(--bs-tertiary-bg); --bs-btn-hover-border-color: var(--rp-line); --bs-btn-hover-color: var(--rp-ink); }}
-          .danger-button {{ color: var(--rp-danger); }}
-          .note {{ margin-top: 10px; color: var(--rp-muted); font-size: 13px; line-height: 1.45; }}
-          .copy-list {{ display: grid; gap: 10px; }}
           .copy-field .input-group-text {{ min-width: 150px; color: var(--rp-muted); font-size: 13px; }}
           .copy-field code {{ min-height: 44px; margin: 0; color: var(--rp-ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.6; background: var(--bs-body-bg); }}
-          .copy-button {{ min-height: 32px; padding: 0 12px; border-radius: 999px; color: var(--bs-primary); font-size: 13px; }}
           .section-dark .copy-field code {{ color: #f5f5f7; background: #1d1d1f; }}
-          .step-number {{ width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: var(--bs-primary); color: white; border-radius: 50%; font-size: 13px; }}
           table {{ width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--rp-ink); }}
           th, td {{ border-bottom: 1px solid var(--rp-soft-line); padding: 14px 10px; text-align: left; white-space: nowrap; }}
           tr:last-child th, tr:last-child td {{ border-bottom: 0; }}
           th {{ color: var(--rp-muted); font-size: 12px; font-weight: 600; }}
           .empty {{ color: var(--rp-muted); text-align: center; padding: 28px; }}
-          .icon-button {{ width: 32px; min-height: 32px; padding: 0; color: var(--rp-danger); }}
-          .table-actions {{ display: flex; gap: 6px; flex-wrap: wrap; }}
-          .small-button {{ min-height: 32px; padding: 0 11px; color: var(--bs-primary); font-size: 12px; }}
-          .footer {{ padding: 28px 0; background: var(--rp-bg); border-top: 1px solid var(--rp-soft-line); }}
-          .footer-links {{ display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; }}
-          .footer-links a {{ color: var(--rp-muted); font-size: 13px; text-decoration: none; }}
-          .footer-links a:hover {{ color: var(--rp-ink); }}
           @media (max-width: 860px) {{
             .section, .hero-band {{ padding: 52px 0; }}
             .hero-band {{ min-height: auto; }}
@@ -1251,12 +1237,10 @@ def _page(title: str, body: str) -> str:
           @media (max-width: 560px) {{
             .brand {{ font-size: 14px; }}
             .brand img {{ width: 24px; height: 24px; }}
-            .button-row {{ width: 100%; flex-direction: column; }}
-            .hero-band .btn, .card button, .danger-button {{ width: 100%; }}
+            .hero-band .btn, .card button {{ width: 100%; }}
             .copy-field {{ display: grid; }}
             .copy-field .input-group-text {{ min-width: 0; border-radius: .5rem .5rem 0 0; }}
             .copy-field code {{ white-space: normal; overflow-wrap: anywhere; border-radius: 0; }}
-            .copy-button {{ width: 100%; }}
             th, td {{ padding: 12px 9px; }}
             h1 {{ font-size: 31px; }}
             h2 {{ font-size: 25px; }}
