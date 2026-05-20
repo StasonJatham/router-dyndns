@@ -1,0 +1,4 @@
+ddns.example.net {
+  encode zstd gzip
+  reverse_proxy ddns:8080
+}
